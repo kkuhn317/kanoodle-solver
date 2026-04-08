@@ -65,6 +65,7 @@ let currentActiveShape = null;
 let lastHoveredIndex = -1;
 let mouseX = 0;
 let mouseY = 0;
+let conditions = [];
 
 // Helper to dynamically change game types
 function setGameType(gameId) {
@@ -83,4 +84,5 @@ function setGameType(gameId) {
     currentActiveShape = null; 
     allSolutions = [];
     currentSolutionIndex = -1;
+    conditions = [];
 }

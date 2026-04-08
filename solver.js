@@ -47,6 +47,34 @@ function canPlace(board, emptyIndex, shape) {
     return true;
 }
 
+function arePiecesTouching(board, p1, p2) {
+    for (let i = 0; i < TOTAL_CELLS; i++) {
+        if (board[i] === p1) {
+            const x = i % BOARD_COLS;
+            const y = Math.floor(i / BOARD_COLS);
+            if (x > 0 && board[i - 1] === p2) return true;
+            if (x < BOARD_COLS - 1 && board[i + 1] === p2) return true;
+            if (y > 0 && board[i - BOARD_COLS] === p2) return true;
+            if (y < BOARD_ROWS - 1 && board[i + BOARD_COLS] === p2) return true;
+        }
+    }
+    return false;
+}
+
+function isPlacementValidForConditions(board, placedPieceId) {
+    for (let cond of conditions) {
+        if (cond.pieces.includes(placedPieceId)) {
+            let otherPieceId = cond.pieces[0] === placedPieceId ? cond.pieces[1] : cond.pieces[0];
+            if (board.includes(otherPieceId)) {
+                let touching = arePiecesTouching(board, placedPieceId, otherPieceId);
+                if (cond.type === 'must_touch' && !touching) return false;
+                if (cond.type === 'cannot_touch' && touching) return false;
+            }
+        }
+    }
+    return true;
+}
+
 function placePiece(board, emptyIndex, shape, pieceId) {
     const rootX = emptyIndex % BOARD_COLS;
     const rootY = Math.floor(emptyIndex / BOARD_COLS);
@@ -68,6 +96,13 @@ function solveRecursive(board, remainingPieces) {
     while (emptyIndex < TOTAL_CELLS && board[emptyIndex] !== 0) { emptyIndex++; }
 
     if (emptyIndex === TOTAL_CELLS) {
+        for (let cond of conditions) {
+            if (cond.type === 'must_touch') {
+                if (!board.includes(cond.pieces[0]) || !board.includes(cond.pieces[1])) {
+                    return false; // Reject solution if both aren't on the board
+                }
+            }
+        }
         allSolutions.push([...board]); 
         if (allSolutions.length >= MAX_SOLUTIONS) return true; 
         return false; 
@@ -80,9 +115,11 @@ function solveRecursive(board, remainingPieces) {
         for (let shape of variations) {
             if (canPlace(board, emptyIndex, shape)) {
                 placePiece(board, emptyIndex, shape, piece.id);
-                let nextPieces = remainingPieces.filter(p => p.id !== piece.id);
                 
-                if (solveRecursive(board, nextPieces)) return true; 
+                if (isPlacementValidForConditions(board, piece.id)) {
+                    let nextPieces = remainingPieces.filter(p => p.id !== piece.id);
+                    if (solveRecursive(board, nextPieces)) return true; 
+                }
                 removePiece(board, emptyIndex, shape);
             }
         }
