@@ -79,10 +79,31 @@ function initializeUI() {
     boardElement.style.display = 'block';
     boardElement.style.position = 'relative';
     
-    const boardWidth = BOARD_COLS * cellSpace + (gridType === 'triangular' ? 26.5 : 0);
-    const boardHeight = BOARD_ROWS * rowHeight + (cellSpace - rowHeight);
-    boardElement.style.width = `${boardWidth + 32}px`; // accounting for 40px padding - 8px gap
-    boardElement.style.height = `${boardHeight + 32}px`;
+    let minX = Infinity, maxX = -Infinity;
+    let minY = Infinity, maxY = -Infinity;
+
+    for (let i = 0; i < TOTAL_CELLS; i++) {
+        const isInvalid = GAMES[currentGame].invalidCells && GAMES[currentGame].invalidCells.includes(i);
+        if (isInvalid) continue;
+
+        const c = i % BOARD_COLS;
+        const r = Math.floor(i / BOARD_COLS);
+        const x = c * cellSpace + (gridType === 'triangular' && r % 2 !== 0 ? 26.5 : 0);
+        const y = r * rowHeight;
+
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+    }
+
+    if (minX === Infinity) { minX = 0; maxX = 0; minY = 0; maxY = 0; }
+
+    const boardWidth = maxX - minX + 45; // 45px is the exact cell width
+    const boardHeight = maxY - minY + 45;
+    
+    boardElement.style.width = `${boardWidth + 40}px`; // accounting for 20px padding on each side
+    boardElement.style.height = `${boardHeight + 40}px`;
 
     for (let i = 0; i < TOTAL_CELLS; i++) {
         const cell = document.createElement('div');
@@ -101,8 +122,8 @@ function initializeUI() {
         const x = c * cellSpace + (gridType === 'triangular' && r % 2 !== 0 ? 26.5 : 0);
         const y = r * rowHeight;
         
-        cell.style.left = `${x + 20}px`; // Match container 20px padding
-        cell.style.top = `${y + 20}px`;
+        cell.style.left = `${x - minX + 20}px`; // Match container 20px padding
+        cell.style.top = `${y - minY + 20}px`;
 
         cell.addEventListener('mouseenter', () => handleHover(i));
         cell.addEventListener('mouseleave', clearHover);
@@ -198,6 +219,12 @@ function setupFanToggle() {
 }
 
 function toggleFanEdition(enabled) {
+    let wasSolving = isSolving;
+    if (isSolving) isSolving = false;
+    if (allSolutions.length > 0 || wasSolving) {
+        boardState = [...startingBoardState];
+    }
+
     if (enabled) {
         PIECE_DEFS.push(...FAN_PIECE_DEFS);
     } else {
@@ -258,6 +285,8 @@ function renderBoard() {
 
 // --- Placement Logic ---
 function selectPiece(pieceId) {
+    if (isSolving) return;
+    if (allSolutions.length > 0) return;
     if (usedPieces.has(pieceId)) return; 
     
     if (activePieceId === pieceId) {
@@ -277,12 +306,18 @@ function updatePaletteUI() {
     PIECE_DEFS.forEach(piece => {
         const btn = document.getElementById(`palette-${piece.id}`);
         btn.classList.remove('selected', 'used');
-        if (usedPieces.has(piece.id)) btn.classList.add('used');
-        else if (activePieceId === piece.id) btn.classList.add('selected');
+        if (allSolutions.length > 0) {
+            btn.classList.add('used');
+        } else if (usedPieces.has(piece.id)) {
+            btn.classList.add('used');
+        } else if (activePieceId === piece.id) {
+            btn.classList.add('selected');
+        }
     });
 }
 
 function actionRotate() {
+    if (isSolving) return;
     if (!activePieceId || !currentActiveShape) return;
     const gridType = GAMES[currentGame].gridType || 'square';
     currentActiveShape = normalizeShape(gridType === 'triangular' ? rotateHex(currentActiveShape) : rotateShape(currentActiveShape));
@@ -291,6 +326,7 @@ function actionRotate() {
 }
 
 function actionFlip() {
+    if (isSolving) return;
     if (!activePieceId || !currentActiveShape) return;
     const gridType = GAMES[currentGame].gridType || 'square';
     currentActiveShape = normalizeShape(gridType === 'triangular' ? flipHex(currentActiveShape) : flipShape(currentActiveShape));
@@ -299,6 +335,7 @@ function actionFlip() {
 }
 
 function handleHover(index) {
+    if (isSolving) return;
     if (boardState[index] === -1) return;
     lastHoveredIndex = index;
     clearHoverVisuals();
@@ -329,14 +366,19 @@ function clearHover() {
 }
 
 function handleClick(index) {
+    if (isSolving) return;
     if (boardState[index] === -1) return;
     if (allSolutions.length > 0) {
         allSolutions = [];
         currentSolutionIndex = -1;
+        boardState = [...startingBoardState];
         updateNavUI();
+        updatePaletteUI();
         btnSolve.innerText = "Find All Solutions";
         btnSolve.disabled = false;
         btnResetStart.style.display = 'none';
+        renderBoard();
+        return;
     }
 
     // 1. Remove piece if clicked on occupied cell
@@ -445,6 +487,7 @@ function showSolution(index) {
     boardState = [...allSolutions[index]]; 
     renderBoard();
     updateNavUI();
+    updatePaletteUI();
 }
 
 // --- Event Listeners ---
@@ -452,6 +495,7 @@ document.getElementById('btn-rotate').addEventListener('click', actionRotate);
 document.getElementById('btn-flip').addEventListener('click', actionFlip);
 
 document.addEventListener('keydown', (e) => {
+    if (isSolving) return;
     if (e.key === 'r' || e.key === 'R') actionRotate();
     if (e.key === 'f' || e.key === 'F') actionFlip();
     if (e.key === 'Escape') { 
@@ -500,6 +544,16 @@ btnSolve.addEventListener('click', async () => {
         return;
     }
 
+    if (allSolutions.length > 0) {
+        boardState = [...startingBoardState];
+        allSolutions = [];
+        currentSolutionIndex = -1;
+        updateNavUI();
+        updatePaletteUI();
+        btnResetStart.style.display = 'none';
+        renderBoard();
+    }
+
     // Validate starting board against conditions
     let startingValid = true;
     for (let cond of conditions) {
@@ -513,6 +567,14 @@ btnSolve.addEventListener('click', async () => {
     if (!startingValid) {
         alert("The starting layout violates the solver conditions!");
         return;
+    }
+
+    if (activePieceId) {
+        activePieceId = null;
+        currentActiveShape = null;
+        updateCursorPieceUI();
+        clearHoverVisuals();
+        updatePaletteUI();
     }
 
     isSolving = true;
@@ -547,8 +609,10 @@ btnSolve.addEventListener('click', async () => {
         btnResetStart.style.display = 'inline-block';
     } else {
         if (!wasAborted) alert("No solutions found for this starting layout.");
+        boardState = [...startingBoardState];
         btnSolve.innerText = "Find All Solutions";
         btnResetStart.style.display = 'none';
+        renderBoard();
     }
 });
 
