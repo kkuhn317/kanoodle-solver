@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Custom Kanoodle Solver</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <div id="board" class="board"></div>
+
+        <div class="controls">
+            <button id="btn-solve" class="primary">Find All Solutions</button>
+            <button id="btn-reset">Reset Board</button>
+        </div>
+
+        <div id="solution-nav" class="controls" style="display: none;">
+            <button id="btn-prev" disabled>&larr; Prev</button>
+            <span id="solution-counter" class="counter-text">0 of 0</span>
+            <button id="btn-next" disabled>Next &rarr;</button>
+        </div>
+
+       <div id="pieces-tray" class="pieces-tray">
+            <div id="palette" class="palette"></div>
+            <div class="controls">
+                <button id="btn-rotate">Rotate (R)</button>
+                <button id="btn-flip">Flip (F)</button>
+            </div>
+            <p style="margin-top: 15px; color: #aaa; font-size: 0.9em;">
+                1. Select a piece from the palette.<br>
+                2. Press 'R' to Rotate, 'F' to Flip.<br>
+                3. Click the board to place it. (Click again to remove).
+            </p>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

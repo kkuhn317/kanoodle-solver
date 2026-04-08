@@ -1,0 +1,412 @@
+// ==========================================
+// 1. GAME CONSTANTS & PIECE DATA
+// ==========================================
+const BOARD_COLS = 11;
+const BOARD_ROWS = 5;
+const TOTAL_CELLS = BOARD_COLS * BOARD_ROWS; 
+const MAX_SOLUTIONS = 1000; 
+
+// The 12 shapes mapped as [x, y] coordinate offsets.
+// Total blocks sum to exactly 55.
+const PIECE_DEFS = [
+    { id: 'white',  color: '#ffffff', base: [[0,0], [1,0], [0,1]] },                   // 3 blocks (Was orange)
+    { id: 'lime',   color: '#a2ca74', base: [[0,0], [1,0], [0,1], [1,1]] },            // 4 blocks
+    { id: 'orange', color: '#ff5722', base: [[0,0], [0,1], [0,2], [1,2]] },            // 4 blocks (Was beige)
+    { id: 'green',  color: '#2e7d32', base: [[1,0], [2,0], [0,1], [1,1], [3,0]] },     // 5 blocks (Z-shape extended)
+    { id: 'purple', color: '#7b1fa2', base: [[0,0], [0,1], [0,2], [0,3]] },            // 4 blocks (Shortened to 4)
+    { id: 'blue',   color: '#1565c0', base: [[0,0], [0,1], [0,2], [0,3], [1,3]] },     // 5 blocks
+    { id: 'cyan',   color: '#b2ebf2', base: [[0,0], [0,1], [0,2], [1,2], [2,2]] },     // 5 blocks
+    { id: 'red',    color: '#d32f2f', base: [[0,0], [1,0], [0,1], [1,1], [0,2]] },     // 5 blocks
+    { id: 'yellow', color: '#ffeb3b', base: [[0,0], [2,0], [0,1], [1,1], [2,1]] },     // 5 blocks
+    { id: 'pink',   color: '#e91e63', base: [[0,0], [0,1], [1,1], [1,2], [2,2]] },     // 5 blocks
+    { id: 'grey',   color: '#9e9e9e', base: [[1,0], [0,1], [1,1], [2,1], [1,2]] },     // 5 blocks
+    { id: 'peach',  color: '#ff8383', base: [[0,0], [1,0], [2,0], [3,0], [1,1]] }      // 5 blocks
+];
+
+// State Variables
+let boardState = new Array(TOTAL_CELLS).fill(0); 
+let startingBoardState = new Array(TOTAL_CELLS).fill(0);
+let pieceVariations = {}; 
+let allSolutions = [];
+let currentSolutionIndex = -1;
+
+// Manual Placement State
+let usedPieces = new Set();
+let activePieceId = null;
+let currentActiveShape = null; // Holds the real-time [[x,y]...] of the hovered piece
+let lastHoveredIndex = -1;
+
+// ==========================================
+// 2. GEOMETRY ENGINE
+// ==========================================
+function normalizeShape(shape) {
+    shape.sort((a, b) => (a[1] !== b[1]) ? (a[1] - b[1]) : (a[0] - b[0]));
+    const rootX = shape[0][0];
+    const rootY = shape[0][1];
+    return shape.map(pt => [pt[0] - rootX, pt[1] - rootY]);
+}
+
+function rotateShape(shape) { return shape.map(pt => [-pt[1], pt[0]]); }
+function flipShape(shape) { return shape.map(pt => [-pt[0], pt[1]]); }
+
+function precomputeVariations() {
+    PIECE_DEFS.forEach(piece => {
+        let uniqueShapes = new Set();
+        let variations = [];
+        let currentShape = piece.base;
+
+        for (let flip = 0; flip < 2; flip++) {
+            for (let rot = 0; rot < 4; rot++) {
+                currentShape = rotateShape(currentShape);
+                let normalized = normalizeShape([...currentShape]);
+                let shapeString = JSON.stringify(normalized);
+                if (!uniqueShapes.has(shapeString)) {
+                    uniqueShapes.add(shapeString);
+                    variations.push(normalized);
+                }
+            }
+            currentShape = flipShape(currentShape);
+        }
+        pieceVariations[piece.id] = variations;
+    });
+}
+
+// ==========================================
+// 3. CORE LOGIC
+// ==========================================
+function canPlace(board, emptyIndex, shape) {
+    const rootX = emptyIndex % BOARD_COLS;
+    const rootY = Math.floor(emptyIndex / BOARD_COLS);
+    for (let pt of shape) {
+        const x = rootX + pt[0];
+        const y = rootY + pt[1];
+        if (x < 0 || x >= BOARD_COLS || y < 0 || y >= BOARD_ROWS) return false;
+        const targetIndex = y * BOARD_COLS + x;
+        if (board[targetIndex] !== 0) return false;
+    }
+    return true;
+}
+
+function placePiece(board, emptyIndex, shape, pieceId) {
+    const rootX = emptyIndex % BOARD_COLS;
+    const rootY = Math.floor(emptyIndex / BOARD_COLS);
+    for (let pt of shape) {
+        board[(rootY + pt[1]) * BOARD_COLS + (rootX + pt[0])] = pieceId;
+    }
+}
+
+function removePiece(board, emptyIndex, shape) {
+    const rootX = emptyIndex % BOARD_COLS;
+    const rootY = Math.floor(emptyIndex / BOARD_COLS);
+    for (let pt of shape) {
+        board[(rootY + pt[1]) * BOARD_COLS + (rootX + pt[0])] = 0;
+    }
+}
+
+function solveRecursive(board, remainingPieces) {
+    let emptyIndex = 0;
+    while (emptyIndex < TOTAL_CELLS && board[emptyIndex] !== 0) { emptyIndex++; }
+
+    if (emptyIndex === TOTAL_CELLS) {
+        allSolutions.push([...board]); 
+        if (allSolutions.length >= MAX_SOLUTIONS) return true; 
+        return false; 
+    }
+
+    for (let i = 0; i < remainingPieces.length; i++) {
+        let piece = remainingPieces[i];
+        let variations = pieceVariations[piece.id];
+
+        for (let shape of variations) {
+            if (canPlace(board, emptyIndex, shape)) {
+                placePiece(board, emptyIndex, shape, piece.id);
+                let nextPieces = remainingPieces.filter(p => p.id !== piece.id);
+                
+                if (solveRecursive(board, nextPieces)) return true; 
+                removePiece(board, emptyIndex, shape);
+            }
+        }
+    }
+    return false;
+}
+
+// ==========================================
+// 4. UI & INTERACTION
+// ==========================================
+const boardElement = document.getElementById('board');
+const navContainer = document.getElementById('solution-nav');
+const counterText = document.getElementById('solution-counter');
+const btnSolve = document.getElementById('btn-solve');
+
+const btnResetStart = document.createElement('button');
+btnResetStart.id = 'btn-reset-start';
+btnResetStart.innerText = 'Reset to Start';
+btnResetStart.style.display = 'none';
+document.getElementById('btn-reset').parentNode.insertBefore(btnResetStart, document.getElementById('btn-reset').nextSibling);
+
+function initializeUI() {
+    precomputeVariations();
+    
+    // Build Board
+    boardElement.innerHTML = ''; 
+    for (let i = 0; i < TOTAL_CELLS; i++) {
+        const cell = document.createElement('div');
+        cell.classList.add('cell');
+        cell.id = `cell-${i}`;
+        
+        cell.addEventListener('mouseenter', () => handleHover(i));
+        cell.addEventListener('mouseleave', clearHover);
+        cell.addEventListener('click', () => handleClick(i));
+        
+        boardElement.appendChild(cell);
+    }
+
+    // Build Visual Palette
+    const paletteContainer = document.getElementById('palette');
+    paletteContainer.innerHTML = '';
+    
+    PIECE_DEFS.forEach(piece => {
+        const btn = document.createElement('div');
+        btn.className = 'palette-piece';
+        btn.id = `palette-${piece.id}`;
+        
+        // Find dimensions of the piece to create a mini-grid
+        let maxX = 0, maxY = 0;
+        piece.base.forEach(pt => {
+            if (pt[0] > maxX) maxX = pt[0];
+            if (pt[1] > maxY) maxY = pt[1];
+        });
+        
+        btn.style.gridTemplateColumns = `repeat(${maxX + 1}, 12px)`;
+        btn.style.gridTemplateRows = `repeat(${maxY + 1}, 12px)`;
+        
+        // Draw the mini cells
+        for (let y = 0; y <= maxY; y++) {
+            for (let x = 0; x <= maxX; x++) {
+                const cell = document.createElement('div');
+                const isFilled = piece.base.some(pt => pt[0] === x && pt[1] === y);
+                if (isFilled) {
+                    cell.className = 'mini-cell';
+                    cell.style.backgroundColor = piece.color;
+                } else {
+                    // Empty space filler
+                    cell.style.width = '12px';
+                    cell.style.height = '12px';
+                }
+                btn.appendChild(cell);
+            }
+        }
+        
+        btn.addEventListener('click', () => selectPiece(piece.id));
+        paletteContainer.appendChild(btn);
+    });
+}
+
+function renderBoard() {
+    for (let i = 0; i < TOTAL_CELLS; i++) {
+        const cellUi = document.getElementById(`cell-${i}`);
+        if (boardState[i] === 0) {
+            cellUi.style.backgroundColor = '#4a4a4a'; 
+        } else {
+            const pieceDef = PIECE_DEFS.find(p => p.id === boardState[i]);
+            cellUi.style.backgroundColor = pieceDef.color; 
+        }
+    }
+}
+
+// --- Placement Logic ---
+function selectPiece(pieceId) {
+    if (usedPieces.has(pieceId)) return; 
+    
+    if (activePieceId === pieceId) {
+        activePieceId = null; 
+        currentActiveShape = null;
+    } else {
+        activePieceId = pieceId;
+        const pieceDef = PIECE_DEFS.find(p => p.id === pieceId);
+        // Load the base shape to start
+        currentActiveShape = normalizeShape([...pieceDef.base]);
+    }
+    updatePaletteUI();
+}
+
+function updatePaletteUI() {
+    PIECE_DEFS.forEach(piece => {
+        const btn = document.getElementById(`palette-${piece.id}`);
+        btn.classList.remove('selected', 'used');
+        if (usedPieces.has(piece.id)) btn.classList.add('used');
+        else if (activePieceId === piece.id) btn.classList.add('selected');
+    });
+}
+
+function actionRotate() {
+    if (!activePieceId || !currentActiveShape) return;
+    currentActiveShape = normalizeShape(rotateShape(currentActiveShape));
+    if (lastHoveredIndex !== -1) handleHover(lastHoveredIndex); 
+}
+
+function actionFlip() {
+    if (!activePieceId || !currentActiveShape) return;
+    currentActiveShape = normalizeShape(flipShape(currentActiveShape));
+    if (lastHoveredIndex !== -1) handleHover(lastHoveredIndex); 
+}
+
+function handleHover(index) {
+    lastHoveredIndex = index;
+    clearHoverVisuals();
+    if (!activePieceId || !currentActiveShape) return;
+    
+    if (canPlace(boardState, index, currentActiveShape)) {
+        const rootX = index % BOARD_COLS;
+        const rootY = Math.floor(index / BOARD_COLS);
+        for (let pt of currentActiveShape) {
+            const cellIndex = (rootY + pt[1]) * BOARD_COLS + (rootX + pt[0]);
+            document.getElementById(`cell-${cellIndex}`).style.boxShadow = 'inset 0 0 0 3px white';
+        }
+    }
+}
+
+function clearHoverVisuals() {
+    for (let i = 0; i < TOTAL_CELLS; i++) {
+        document.getElementById(`cell-${i}`).style.boxShadow = 'none';
+    }
+}
+
+function clearHover() {
+    lastHoveredIndex = -1;
+    clearHoverVisuals();
+}
+
+function handleClick(index) {
+    if (allSolutions.length > 0) {
+        allSolutions = [];
+        currentSolutionIndex = -1;
+        updateNavUI();
+        btnSolve.innerText = "Find All Solutions";
+        btnSolve.disabled = false;
+        btnResetStart.style.display = 'none';
+    }
+
+    // 1. Remove piece if clicked on occupied cell
+    if (boardState[index] !== 0) {
+        const clickedPieceId = boardState[index];
+        for (let i = 0; i < TOTAL_CELLS; i++) {
+            if (boardState[i] === clickedPieceId) boardState[i] = 0;
+        }
+        usedPieces.delete(clickedPieceId);
+        updatePaletteUI();
+        renderBoard();
+        clearHoverVisuals();
+        return;
+    }
+
+    // 2. Place active piece
+    if (activePieceId && currentActiveShape) {
+        if (canPlace(boardState, index, currentActiveShape)) {
+            placePiece(boardState, index, currentActiveShape, activePieceId);
+            usedPieces.add(activePieceId);
+            activePieceId = null; 
+            currentActiveShape = null;
+            updatePaletteUI();
+            renderBoard();
+            clearHoverVisuals();
+        }
+    }
+}
+
+// --- Solution Navigation ---
+function updateNavUI() {
+    if (allSolutions.length === 0) {
+        navContainer.style.display = 'none';
+        return;
+    }
+    navContainer.style.display = 'flex';
+    counterText.innerText = `${currentSolutionIndex + 1} of ${allSolutions.length}`;
+    document.getElementById('btn-prev').disabled = currentSolutionIndex === 0;
+    document.getElementById('btn-next').disabled = currentSolutionIndex === allSolutions.length - 1;
+}
+
+function showSolution(index) {
+    if (index < 0 || index >= allSolutions.length) return;
+    currentSolutionIndex = index;
+    boardState = [...allSolutions[index]]; 
+    renderBoard();
+    updateNavUI();
+}
+
+// --- Event Listeners ---
+document.getElementById('btn-rotate').addEventListener('click', actionRotate);
+document.getElementById('btn-flip').addEventListener('click', actionFlip);
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'r' || e.key === 'R') actionRotate();
+    if (e.key === 'f' || e.key === 'F') actionFlip();
+    if (e.key === 'Escape') { 
+        activePieceId = null; 
+        currentActiveShape = null;
+        updatePaletteUI(); 
+        clearHoverVisuals(); 
+    }
+});
+
+document.getElementById('btn-reset').addEventListener('click', () => {
+    boardState.fill(0);
+    usedPieces.clear();
+    activePieceId = null;
+    currentActiveShape = null;
+    allSolutions = [];
+    currentSolutionIndex = -1;
+    btnSolve.innerText = "Find All Solutions";
+    btnSolve.disabled = false;
+    btnResetStart.style.display = 'none';
+    updatePaletteUI();
+    updateNavUI();
+    renderBoard();
+});
+
+btnSolve.addEventListener('click', () => {
+    btnSolve.innerText = "Solving... (This may take a moment)";
+    btnSolve.disabled = true;
+    startingBoardState = [...boardState];
+    
+    setTimeout(() => {
+        allSolutions = [];
+        let remainingPieces = PIECE_DEFS.filter(p => !usedPieces.has(p.id));
+        solveRecursive(boardState, remainingPieces);
+        
+        if (allSolutions.length >= MAX_SOLUTIONS) {
+            btnSolve.innerText = `Found ${MAX_SOLUTIONS}+ Solutions (Capped)`;
+        } else {
+            btnSolve.innerText = `Found ${allSolutions.length} Solutions!`;
+        }
+
+        if (allSolutions.length > 0) {
+            showSolution(0);
+            btnResetStart.style.display = 'inline-block';
+        } else {
+            alert("No solutions found for this starting layout.");
+            btnSolve.innerText = "Find All Solutions";
+            btnSolve.disabled = false;
+            btnResetStart.style.display = 'none';
+        }
+    }, 50);
+});
+
+document.getElementById('btn-prev').addEventListener('click', () => showSolution(currentSolutionIndex - 1));
+document.getElementById('btn-next').addEventListener('click', () => showSolution(currentSolutionIndex + 1));
+
+btnResetStart.addEventListener('click', () => {
+    boardState = [...startingBoardState];
+    allSolutions = [];
+    currentSolutionIndex = -1;
+    btnSolve.innerText = "Find All Solutions";
+    btnSolve.disabled = false;
+    btnResetStart.style.display = 'none';
+    updatePaletteUI();
+    updateNavUI();
+    renderBoard();
+});
+
+// Boot up
+initializeUI();
+renderBoard();
