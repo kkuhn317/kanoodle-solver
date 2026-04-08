@@ -69,157 +69,6 @@ function setupGameSelector() {
     boardElement.parentNode.insertBefore(selectorContainer, boardElement);
 }
 
-function setupConditionsUI() {
-    const container = document.createElement('div');
-    container.style.marginTop = '10px';
-    container.style.marginBottom = '20px';
-    container.style.marginLeft = 'auto';
-    container.style.marginRight = 'auto';
-    container.style.padding = '15px';
-    container.style.backgroundColor = '#1a1a1a';
-    container.style.borderRadius = '8px';
-    container.style.width = '100%';
-    container.style.maxWidth = '600px';
-
-    const title = document.createElement('h3');
-    title.innerText = 'Solver Conditions';
-    title.style.marginBottom = '10px';
-    title.style.textAlign = 'center';
-    title.style.color = '#aaaaaa';
-    title.style.fontSize = '1.1rem';
-    container.appendChild(title);
-
-    const controls = document.createElement('div');
-    controls.style.display = 'flex';
-    controls.style.gap = '10px';
-    controls.style.justifyContent = 'center';
-    controls.style.marginBottom = '10px';
-
-    const p1Select = document.createElement('select');
-    p1Select.id = 'cond-piece1';
-    
-    const typeSelect = document.createElement('select');
-    typeSelect.id = 'cond-type';
-    typeSelect.innerHTML = `
-        <option value="must_touch">Must Touch</option>
-        <option value="cannot_touch">Cannot Touch</option>
-    `;
-    
-    const p2Select = document.createElement('select');
-    p2Select.id = 'cond-piece2';
-
-    const btnAdd = document.createElement('button');
-    btnAdd.innerText = 'Add';
-    btnAdd.addEventListener('click', () => {
-        const p1 = p1Select.value;
-        const p2 = p2Select.value;
-        const type = typeSelect.value;
-        if (p1 === p2) {
-            alert('Please select two different pieces.');
-            return;
-        }
-        if (conditions.some(c => (c.pieces.includes(p1) && c.pieces.includes(p2)))) {
-            alert('A condition between these pieces already exists. Remove it first.');
-            return;
-        }
-        conditions.push({ type, pieces: [p1, p2] });
-        renderConditions();
-    });
-
-    [p1Select, typeSelect, p2Select].forEach(sel => {
-        sel.style.padding = '5px';
-        sel.style.backgroundColor = '#242424';
-        sel.style.color = '#fff';
-        sel.style.border = '1px solid #4a4a4a';
-        sel.style.borderRadius = '4px';
-    });
-
-    controls.appendChild(p1Select);
-    controls.appendChild(typeSelect);
-    controls.appendChild(p2Select);
-    controls.appendChild(btnAdd);
-
-    container.appendChild(controls);
-
-    const list = document.createElement('div');
-    list.id = 'conditions-list';
-    list.style.display = 'flex';
-    list.style.flexDirection = 'column';
-    list.style.gap = '5px';
-    container.appendChild(list);
-
-    const paletteContainer = document.getElementById('palette');
-    paletteContainer.parentNode.insertBefore(container, paletteContainer.nextSibling);
-}
-
-function updateConditionSelects() {
-    const p1Select = document.getElementById('cond-piece1');
-    const p2Select = document.getElementById('cond-piece2');
-    if (!p1Select || !p2Select) return;
-    
-    p1Select.innerHTML = '';
-    p2Select.innerHTML = '';
-    
-    PIECE_DEFS.forEach(p => {
-        const opt1 = document.createElement('option');
-        opt1.value = p.id;
-        opt1.innerText = p.id;
-        p1Select.appendChild(opt1);
-        
-        const opt2 = document.createElement('option');
-        opt2.value = p.id;
-        opt2.innerText = p.id;
-        p2Select.appendChild(opt2);
-    });
-    
-    if (PIECE_DEFS.length > 1) {
-        p2Select.selectedIndex = 1;
-    }
-}
-
-function renderConditions() {
-    const list = document.getElementById('conditions-list');
-    if (!list) return;
-    list.innerHTML = '';
-    
-    conditions.forEach((cond, index) => {
-        const item = document.createElement('div');
-        item.style.display = 'flex';
-        item.style.justifyContent = 'space-between';
-        item.style.alignItems = 'center';
-        item.style.backgroundColor = '#2a2a2a';
-        item.style.padding = '8px 12px';
-        item.style.borderRadius = '4px';
-        
-        const text = document.createElement('span');
-        const actionStr = cond.type === 'must_touch' ? 'MUST TOUCH' : 'CANNOT TOUCH';
-        
-        const getPieceColor = (id) => {
-            const p = PIECE_DEFS.find(p => p.id === id);
-            return p ? (p.color === '#000000' ? '#aaaaaa' : p.color) : '#fff';
-        };
-        
-        text.innerHTML = `<span style="color:${getPieceColor(cond.pieces[0])}; font-weight:bold;">${cond.pieces[0]}</span> 
-                          <span style="color:#888; font-size:0.9em; margin:0 5px;">${actionStr}</span> 
-                          <span style="color:${getPieceColor(cond.pieces[1])}; font-weight:bold;">${cond.pieces[1]}</span>`;
-        
-        const btnRemove = document.createElement('button');
-        btnRemove.innerText = 'Remove';
-        btnRemove.style.padding = '4px 8px';
-        btnRemove.style.backgroundColor = '#d32f2f';
-        btnRemove.style.border = 'none';
-        btnRemove.style.fontSize = '0.8rem';
-        btnRemove.addEventListener('click', () => {
-            conditions.splice(index, 1);
-            renderConditions();
-        });
-        
-        item.appendChild(text);
-        item.appendChild(btnRemove);
-        list.appendChild(item);
-    });
-}
-
 function initializeUI() {
     precomputeVariations();
     
@@ -558,6 +407,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 document.getElementById('btn-reset').addEventListener('click', () => {
+    isSolving = false;
     boardState.fill(0);
     usedPieces.clear();
     activePieceId = null;
@@ -582,7 +432,14 @@ document.addEventListener('mousemove', (e) => {
     }
 });
 
-btnSolve.addEventListener('click', () => {
+btnSolve.addEventListener('click', async () => {
+    if (isSolving) {
+        isSolving = false; // Stop signal
+        btnSolve.innerText = "Stopping...";
+        btnSolve.disabled = true;
+        return;
+    }
+
     // Validate starting board against conditions
     let startingValid = true;
     for (let cond of conditions) {
@@ -598,31 +455,41 @@ btnSolve.addEventListener('click', () => {
         return;
     }
 
-    btnSolve.innerText = "Solving... (This may take a moment)";
-    btnSolve.disabled = true;
+    isSolving = true;
+    btnSolve.innerText = "Stop (Found 0)";
     startingBoardState = [...boardState];
+    allSolutions = [];
     
-    setTimeout(() => {
-        allSolutions = [];
-        let remainingPieces = PIECE_DEFS.filter(p => !usedPieces.has(p.id));
-        solveRecursive(boardState, remainingPieces);
-        
-        if (allSolutions.length >= MAX_SOLUTIONS) {
-            btnSolve.innerText = `Found ${MAX_SOLUTIONS}+ Solutions (Capped)`;
-        } else {
-            btnSolve.innerText = `Found ${allSolutions.length} Solutions!`;
-        }
+    let remainingPieces = PIECE_DEFS.filter(p => !usedPieces.has(p.id));
+    
+    // Wait a brief moment so the UI can update the button text
+    await new Promise(r => setTimeout(r, 10));
 
-        if (allSolutions.length > 0) {
-            showSolution(0);
-            btnResetStart.style.display = 'inline-block';
-        } else {
-            alert("No solutions found for this starting layout.");
-            btnSolve.innerText = "Find All Solutions";
-            btnSolve.disabled = false;
-            btnResetStart.style.display = 'none';
-        }
-    }, 50);
+    await solveRecursive(boardState, remainingPieces, () => {
+        if (isSolving) btnSolve.innerText = `Stop (Found ${allSolutions.length})`;
+    });
+    
+    const wasAborted = !isSolving;
+    isSolving = false;
+
+    if (allSolutions.length >= MAX_SOLUTIONS) {
+        btnSolve.innerText = `Found ${MAX_SOLUTIONS}+ Solutions (Capped)`;
+    } else if (wasAborted) {
+        btnSolve.innerText = `Stopped. Found ${allSolutions.length} Solutions`;
+    } else {
+        btnSolve.innerText = `Found ${allSolutions.length} Solutions!`;
+    }
+    
+    btnSolve.disabled = false;
+
+    if (allSolutions.length > 0) {
+        showSolution(0);
+        btnResetStart.style.display = 'inline-block';
+    } else {
+        if (!wasAborted) alert("No solutions found for this starting layout.");
+        btnSolve.innerText = "Find All Solutions";
+        btnResetStart.style.display = 'none';
+    }
 });
 
 document.getElementById('btn-prev').addEventListener('click', () => showSolution(currentSolutionIndex - 1));

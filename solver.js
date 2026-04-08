@@ -91,7 +91,11 @@ function removePiece(board, emptyIndex, shape) {
     }
 }
 
-function solveRecursive(board, remainingPieces) {
+let solverIterations = 0;
+
+async function solveRecursive(board, remainingPieces, onProgress) {
+    if (!isSolving) return true; // Abort signal
+
     let emptyIndex = 0;
     while (emptyIndex < TOTAL_CELLS && board[emptyIndex] !== 0) { emptyIndex++; }
 
@@ -104,6 +108,7 @@ function solveRecursive(board, remainingPieces) {
             }
         }
         allSolutions.push([...board]); 
+        if (onProgress) onProgress(); 
         if (allSolutions.length >= MAX_SOLUTIONS) return true; 
         return false; 
     }
@@ -115,10 +120,17 @@ function solveRecursive(board, remainingPieces) {
         for (let shape of variations) {
             if (canPlace(board, emptyIndex, shape)) {
                 placePiece(board, emptyIndex, shape, piece.id);
-                
+                    
                 if (isPlacementValidForConditions(board, piece.id)) {
                     let nextPieces = remainingPieces.filter(p => p.id !== piece.id);
-                    if (solveRecursive(board, nextPieces)) return true; 
+                    
+                    solverIterations++;
+                    if (solverIterations % 2500 === 0) {
+                        await new Promise(r => setTimeout(r, 0)); // Yield to keep browser responsive
+                        if (onProgress) onProgress();
+                    }
+
+                    if (await solveRecursive(board, nextPieces, onProgress)) return true; 
                 }
                 removePiece(board, emptyIndex, shape);
             }

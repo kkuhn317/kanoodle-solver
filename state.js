@@ -66,9 +66,11 @@ let lastHoveredIndex = -1;
 let mouseX = 0;
 let mouseY = 0;
 let conditions = [];
+let isSolving = false;
 
 // Helper to dynamically change game types
 function setGameType(gameId) {
+    isSolving = false;
     currentGame = gameId;
     BOARD_COLS = GAMES[gameId].cols;
     BOARD_ROWS = GAMES[gameId].rows;
