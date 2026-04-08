@@ -128,8 +128,8 @@ function renderConditions() {
         const actionStr = cond.type === 'must_touch' ? 'MUST TOUCH' : 'CANNOT TOUCH';
         
         const getPieceColor = (id) => {
-            const p = PIECE_DEFS.find(p => p.id === id);
-            return p ? (p.color === '#000000' ? '#aaaaaa' : p.color) : '#fff';
+            const colorHex = COLORS[id.replace(/[0-9]/g, '')];
+            return colorHex ? (colorHex === '#000000' ? '#aaaaaa' : colorHex) : '#fff';
         };
         
         text.innerHTML = `<span style="color:${getPieceColor(cond.pieces[0])}; font-weight:bold;">${cond.pieces[0]}</span> 

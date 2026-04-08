@@ -1,5 +1,3 @@
-/* Note: Ensure state.js and solver.js are loaded before script.js in your HTML */
-
 const boardElement = document.getElementById('board');
 const navContainer = document.getElementById('solution-nav');
 const counterText = document.getElementById('solution-counter');
@@ -72,14 +70,40 @@ function setupGameSelector() {
 function initializeUI() {
     precomputeVariations();
     
+    const gridType = GAMES[currentGame].gridType || 'square';
+    const cellSpace = 53; // 45px width + 8px gap
+    const rowHeight = gridType === 'triangular' ? cellSpace * 0.866 : cellSpace;
+
     // Build Board
     boardElement.innerHTML = ''; 
-    boardElement.style.gridTemplateColumns = `repeat(${BOARD_COLS}, 45px)`; // Dynamically set shape width
+    boardElement.style.display = 'block';
+    boardElement.style.position = 'relative';
+    
+    const boardWidth = BOARD_COLS * cellSpace + (gridType === 'triangular' ? 26.5 : 0);
+    const boardHeight = BOARD_ROWS * rowHeight + (cellSpace - rowHeight);
+    boardElement.style.width = `${boardWidth + 32}px`; // accounting for 40px padding - 8px gap
+    boardElement.style.height = `${boardHeight + 32}px`;
+
     for (let i = 0; i < TOTAL_CELLS; i++) {
         const cell = document.createElement('div');
         cell.classList.add('cell');
         cell.id = `cell-${i}`;
+        cell.style.position = 'absolute';
         
+        const c = i % BOARD_COLS;
+        const r = Math.floor(i / BOARD_COLS);
+        
+        const isInvalid = GAMES[currentGame].invalidCells && GAMES[currentGame].invalidCells.includes(i);
+        if (isInvalid) {
+            cell.style.display = 'none';
+        }
+        
+        const x = c * cellSpace + (gridType === 'triangular' && r % 2 !== 0 ? 26.5 : 0);
+        const y = r * rowHeight;
+        
+        cell.style.left = `${x + 20}px`; // Match container 20px padding
+        cell.style.top = `${y + 20}px`;
+
         cell.addEventListener('mouseenter', () => handleHover(i));
         cell.addEventListener('mouseleave', clearHover);
         cell.addEventListener('click', () => handleClick(i));
@@ -93,43 +117,51 @@ function initializeUI() {
 }
 
 function buildPalette() {
+    const gridType = GAMES[currentGame].gridType || 'square';
     const paletteContainer = document.getElementById('palette');
     paletteContainer.innerHTML = '';
     
+    const cellW = 12, gap = 2;
+    const space = cellW + gap;
+    const rowH = gridType === 'triangular' ? space * 0.866 : space;
+
     PIECE_DEFS.forEach(piece => {
         const btn = document.createElement('div');
         btn.className = 'palette-piece';
         btn.id = `palette-${piece.id}`;
+        btn.style.display = 'block';
+        btn.style.position = 'relative';
         
-        // Find dimensions of the piece to create a mini-grid
-        let maxX = 0, maxY = 0;
+        let minX = Infinity, maxX = -Infinity;
+        let minY = Infinity, maxY = -Infinity;
+        
         piece.base.forEach(pt => {
-            if (pt[0] > maxX) maxX = pt[0];
-            if (pt[1] > maxY) maxY = pt[1];
+            let px = gridType === 'triangular' ? (pt[0] + pt[1]/2) * space : pt[0] * space;
+            let py = pt[1] * rowH;
+            if (px < minX) minX = px;
+            if (px > maxX) maxX = px;
+            if (py < minY) minY = py;
+            if (py > maxY) maxY = py;
         });
         
-        btn.style.gridTemplateColumns = `repeat(${maxX + 1}, 12px)`;
-        btn.style.gridTemplateRows = `repeat(${maxY + 1}, 12px)`;
+        btn.style.width = `${maxX - minX + cellW + 12}px`; // Includes 6px container padding
+        btn.style.height = `${maxY - minY + cellW + 12}px`;
         
-        // Draw the mini cells
-        for (let y = 0; y <= maxY; y++) {
-            for (let x = 0; x <= maxX; x++) {
-                const cell = document.createElement('div');
-                const isFilled = piece.base.some(pt => pt[0] === x && pt[1] === y);
-                if (isFilled) {
-                    cell.className = 'mini-cell';
-                    cell.style.backgroundColor = piece.color;
-                    if (piece.color === '#000000') {
-                        cell.style.border = '1px solid #555';
-                    }
-                } else {
-                    // Empty space filler
-                    cell.style.width = '12px';
-                    cell.style.height = '12px';
-                }
-                btn.appendChild(cell);
-            }
-        }
+        piece.base.forEach(pt => {
+            const cell = document.createElement('div');
+            cell.className = 'mini-cell';
+            cell.style.position = 'absolute';
+            const pieceColor = COLORS[piece.id.replace(/[0-9]/g, '')];
+            cell.style.backgroundColor = pieceColor;
+            if (pieceColor === '#000000') cell.style.border = '1px solid #555';
+            
+            let px = gridType === 'triangular' ? (pt[0] + pt[1]/2) * space : pt[0] * space;
+            let py = pt[1] * rowH;
+            
+            cell.style.left = `${px - minX + 6}px`;
+            cell.style.top = `${py - minY + 6}px`;
+            btn.appendChild(cell);
+        });
         
         btn.addEventListener('click', () => selectPiece(piece.id));
         paletteContainer.appendChild(btn);
@@ -206,13 +238,16 @@ function toggleFanEdition(enabled) {
 function renderBoard() {
     for (let i = 0; i < TOTAL_CELLS; i++) {
         const cellUi = document.getElementById(`cell-${i}`);
+        if (!cellUi || boardState[i] === -1) continue;
+        
         if (boardState[i] === 0) {
             cellUi.style.backgroundColor = '#4a4a4a'; 
             cellUi.style.border = 'none';
         } else {
             const pieceDef = PIECE_DEFS.find(p => p.id === boardState[i]);
-            cellUi.style.backgroundColor = pieceDef.color; 
-            if (pieceDef.color === '#000000') {
+            const pieceColor = COLORS[pieceDef.id.replace(/[0-9]/g, '')];
+            cellUi.style.backgroundColor = pieceColor; 
+            if (pieceColor === '#000000') {
                 cellUi.style.border = '2px solid #555';
             } else {
                 cellUi.style.border = 'none';
@@ -249,19 +284,22 @@ function updatePaletteUI() {
 
 function actionRotate() {
     if (!activePieceId || !currentActiveShape) return;
-    currentActiveShape = normalizeShape(rotateShape(currentActiveShape));
+    const gridType = GAMES[currentGame].gridType || 'square';
+    currentActiveShape = normalizeShape(gridType === 'triangular' ? rotateHex(currentActiveShape) : rotateShape(currentActiveShape));
     updateCursorPieceUI();
     if (lastHoveredIndex !== -1) handleHover(lastHoveredIndex); 
 }
 
 function actionFlip() {
     if (!activePieceId || !currentActiveShape) return;
-    currentActiveShape = normalizeShape(flipShape(currentActiveShape));
+    const gridType = GAMES[currentGame].gridType || 'square';
+    currentActiveShape = normalizeShape(gridType === 'triangular' ? flipHex(currentActiveShape) : flipShape(currentActiveShape));
     updateCursorPieceUI();
     if (lastHoveredIndex !== -1) handleHover(lastHoveredIndex); 
 }
 
 function handleHover(index) {
+    if (boardState[index] === -1) return;
     lastHoveredIndex = index;
     clearHoverVisuals();
     if (!activePieceId || !currentActiveShape) return;
@@ -269,8 +307,11 @@ function handleHover(index) {
     if (canPlace(boardState, index, currentActiveShape)) {
         const rootX = index % BOARD_COLS;
         const rootY = Math.floor(index / BOARD_COLS);
+        const gridType = GAMES[currentGame].gridType || 'square';
+        
         for (let pt of currentActiveShape) {
-            const cellIndex = (rootY + pt[1]) * BOARD_COLS + (rootX + pt[0]);
+            const [x, y] = getBoardCoords(rootX, rootY, pt[0], pt[1], gridType);
+            const cellIndex = y * BOARD_COLS + x;
             document.getElementById(`cell-${cellIndex}`).style.boxShadow = 'inset 0 0 0 3px white';
         }
     }
@@ -288,6 +329,7 @@ function clearHover() {
 }
 
 function handleClick(index) {
+    if (boardState[index] === -1) return;
     if (allSolutions.length > 0) {
         allSolutions = [];
         currentSolutionIndex = -1;
@@ -330,41 +372,56 @@ function updateCursorPieceUI() {
         cursorPiece.style.display = 'none';
         return;
     }
-    cursorPiece.style.display = 'grid';
-    const pieceDef = PIECE_DEFS.find(p => p.id === activePieceId);
     
-    let minX = 0, maxX = 0, minY = 0, maxY = 0;
-    currentActiveShape.forEach(pt => {
-        if (pt[0] < minX) minX = pt[0];
-        if (pt[0] > maxX) maxX = pt[0];
-        if (pt[1] < minY) minY = pt[1];
-        if (pt[1] > maxY) maxY = pt[1];
-    });
+    const gridType = GAMES[currentGame].gridType || 'square';
+    const cellW = 45, gap = 8;
+    const space = cellW + gap;
+    const rowH = gridType === 'triangular' ? space * 0.866 : space;
     
-    cursorPiece.style.gridTemplateColumns = `repeat(${maxX - minX + 1}, 45px)`;
-    cursorPiece.style.gridTemplateRows = `repeat(${maxY - minY + 1}, 45px)`;
+    cursorPiece.style.display = 'block';
     cursorPiece.innerHTML = '';
     
-    for (let y = minY; y <= maxY; y++) {
-        for (let x = minX; x <= maxX; x++) {
-            const cell = document.createElement('div');
-            if (currentActiveShape.some(pt => pt[0] === x && pt[1] === y)) {
-                cell.style.width = '45px';
-                cell.style.height = '45px';
-                cell.style.backgroundColor = pieceDef.color;
-                cell.style.borderRadius = '50%';
-                cell.style.opacity = '0.8';
-                if (pieceDef.color === '#000000') {
-                    cell.style.border = '2px solid #555';
-                }
-            }
-            cursorPiece.appendChild(cell);
-        }
-    }
+    const pieceDef = PIECE_DEFS.find(p => p.id === activePieceId);
+    
+    let minX = Infinity, maxX = -Infinity;
+    let minY = Infinity, maxY = -Infinity;
+    
+    currentActiveShape.forEach(pt => {
+        let px = gridType === 'triangular' ? (pt[0] + pt[1]/2) * space : pt[0] * space;
+        let py = pt[1] * rowH;
+        if (px < minX) minX = px;
+        if (px > maxX) maxX = px;
+        if (py < minY) minY = py;
+        if (py > maxY) maxY = py;
+    });
+    
+    cursorPiece.style.width = `${maxX - minX + cellW}px`;
+    cursorPiece.style.height = `${maxY - minY + cellW}px`;
+    
+    currentActiveShape.forEach(pt => {
+        const cell = document.createElement('div');
+        cell.style.position = 'absolute';
+        cell.style.width = '45px';
+        cell.style.height = '45px';
+        const pieceColor = COLORS[pieceDef.id.replace(/[0-9]/g, '')];
+        cell.style.backgroundColor = pieceColor;
+        cell.style.borderRadius = '50%';
+        cell.style.opacity = '0.8';
+        if (pieceColor === '#000000') cell.style.border = '2px solid #555';
+        
+        let px = gridType === 'triangular' ? (pt[0] + pt[1]/2) * space : pt[0] * space;
+        let py = pt[1] * rowH;
+        
+        cell.style.left = `${px - minX}px`;
+        cell.style.top = `${py - minY}px`;
+        cursorPiece.appendChild(cell);
+    });
     
     // Offset so the "root" block (0,0) is exactly centered on the cursor tip
-    const centerX = (-minX * 53) + 22.5; // 45px width + 8px gap = 53px spacing. 22.5px is half the 45px cell.
-    const centerY = (-minY * 53) + 22.5;
+    const rootPx = gridType === 'triangular' ? 0 : 0; // Since root is always at [0,0] => px=0
+    const rootPy = 0;
+    const centerX = rootPx - minX + 22.5; 
+    const centerY = rootPy - minY + 22.5;
     cursorPiece.style.transform = `translate(-${centerX}px, -${centerY}px)`;
     cursorPiece.style.left = mouseX + 'px';
     cursorPiece.style.top = mouseY + 'px';
@@ -409,6 +466,9 @@ document.addEventListener('keydown', (e) => {
 document.getElementById('btn-reset').addEventListener('click', () => {
     isSolving = false;
     boardState.fill(0);
+    if (GAMES[currentGame].invalidCells) {
+        GAMES[currentGame].invalidCells.forEach(i => boardState[i] = -1);
+    }
     usedPieces.clear();
     activePieceId = null;
     currentActiveShape = null;

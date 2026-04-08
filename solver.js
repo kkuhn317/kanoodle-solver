@@ -12,15 +12,21 @@ function normalizeShape(shape) {
 function rotateShape(shape) { return shape.map(pt => [-pt[1], pt[0]]); }
 function flipShape(shape) { return shape.map(pt => [-pt[0], pt[1]]); }
 
+function rotateHex(shape) { return shape.map(pt => [-pt[1], pt[0] + pt[1]]); }
+function flipHex(shape) { return shape.map(pt => [-pt[0] - pt[1], pt[1]]); }
+
 function precomputeVariations() {
+    const gridType = GAMES[currentGame].gridType || 'square';
+    const numRotations = gridType === 'triangular' ? 6 : 4;
+
     PIECE_DEFS.forEach(piece => {
         let uniqueShapes = new Set();
         let variations = [];
         let currentShape = piece.base;
 
         for (let flip = 0; flip < 2; flip++) {
-            for (let rot = 0; rot < 4; rot++) {
-                currentShape = rotateShape(currentShape);
+            for (let rot = 0; rot < numRotations; rot++) {
+                currentShape = gridType === 'triangular' ? rotateHex(currentShape) : rotateShape(currentShape);
                 let normalized = normalizeShape([...currentShape]);
                 let shapeString = JSON.stringify(normalized);
                 if (!uniqueShapes.has(shapeString)) {
@@ -28,18 +34,34 @@ function precomputeVariations() {
                     variations.push(normalized);
                 }
             }
-            currentShape = flipShape(currentShape);
+            currentShape = gridType === 'triangular' ? flipHex(currentShape) : flipShape(currentShape);
         }
         pieceVariations[piece.id] = variations;
     });
 }
 
+function getBoardCoords(rootX, rootY, ptX, ptY, gridType) {
+    if (gridType === 'triangular') {
+        // rootX, rootY are Offset coordinates. ptX, ptY are Axial coordinates.
+        const rootQ = rootX - Math.floor(rootY / 2);
+        const rootR = rootY;
+        const targetQ = rootQ + ptX;
+        const targetR = rootR + ptY;
+        // Convert back to Offset 
+        const targetX = targetQ + Math.floor(targetR / 2);
+        const targetY = targetR;
+        return [targetX, targetY];
+    }
+    return [rootX + ptX, rootY + ptY];
+}
+
 function canPlace(board, emptyIndex, shape) {
     const rootX = emptyIndex % BOARD_COLS;
     const rootY = Math.floor(emptyIndex / BOARD_COLS);
+    const gridType = GAMES[currentGame].gridType || 'square';
+    
     for (let pt of shape) {
-        const x = rootX + pt[0];
-        const y = rootY + pt[1];
+        const [x, y] = getBoardCoords(rootX, rootY, pt[0], pt[1], gridType);
         if (x < 0 || x >= BOARD_COLS || y < 0 || y >= BOARD_ROWS) return false;
         const targetIndex = y * BOARD_COLS + x;
         if (board[targetIndex] !== 0) return false;
@@ -47,15 +69,35 @@ function canPlace(board, emptyIndex, shape) {
     return true;
 }
 
+function getNeighbors(index, gridType) {
+    const c = index % BOARD_COLS;
+    const r = Math.floor(index / BOARD_COLS);
+    let neighbors = [];
+    
+    const dirs = gridType === 'triangular' 
+        ? (r % 2 !== 0 
+            ? [[-1, 0], [1, 0], [0, -1], [1, -1], [0, 1], [1, 1]] 
+            : [[-1, 0], [1, 0], [-1, -1], [0, -1], [-1, 1], [0, 1]])
+        : [[-1, 0], [1, 0], [0, -1], [0, 1]];
+        
+    dirs.forEach(d => {
+        const nc = c + d[0];
+        const nr = r + d[1];
+        if (nc >= 0 && nc < BOARD_COLS && nr >= 0 && nr < BOARD_ROWS) {
+            neighbors.push(nr * BOARD_COLS + nc);
+        }
+    });
+    return neighbors;
+}
+
 function arePiecesTouching(board, p1, p2) {
+    const gridType = GAMES[currentGame].gridType || 'square';
     for (let i = 0; i < TOTAL_CELLS; i++) {
         if (board[i] === p1) {
-            const x = i % BOARD_COLS;
-            const y = Math.floor(i / BOARD_COLS);
-            if (x > 0 && board[i - 1] === p2) return true;
-            if (x < BOARD_COLS - 1 && board[i + 1] === p2) return true;
-            if (y > 0 && board[i - BOARD_COLS] === p2) return true;
-            if (y < BOARD_ROWS - 1 && board[i + BOARD_COLS] === p2) return true;
+            const neighbors = getNeighbors(i, gridType);
+            for (let n of neighbors) {
+                if (board[n] === p2) return true;
+            }
         }
     }
     return false;
@@ -78,16 +120,20 @@ function isPlacementValidForConditions(board, placedPieceId) {
 function placePiece(board, emptyIndex, shape, pieceId) {
     const rootX = emptyIndex % BOARD_COLS;
     const rootY = Math.floor(emptyIndex / BOARD_COLS);
+    const gridType = GAMES[currentGame].gridType || 'square';
     for (let pt of shape) {
-        board[(rootY + pt[1]) * BOARD_COLS + (rootX + pt[0])] = pieceId;
+        const [x, y] = getBoardCoords(rootX, rootY, pt[0], pt[1], gridType);
+        board[y * BOARD_COLS + x] = pieceId;
     }
 }
 
 function removePiece(board, emptyIndex, shape) {
     const rootX = emptyIndex % BOARD_COLS;
     const rootY = Math.floor(emptyIndex / BOARD_COLS);
+    const gridType = GAMES[currentGame].gridType || 'square';
     for (let pt of shape) {
-        board[(rootY + pt[1]) * BOARD_COLS + (rootX + pt[0])] = 0;
+        const [x, y] = getBoardCoords(rootX, rootY, pt[0], pt[1], gridType);
+        board[y * BOARD_COLS + x] = 0;
     }
 }
 

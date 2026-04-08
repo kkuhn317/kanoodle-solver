@@ -2,37 +2,77 @@
 // GAME CONSTANTS & GLOBAL STATE
 // ==========================================
 
+const COLORS = {
+    white:   '#ffffff',
+    lime:    '#a2ca74',
+    orange:  '#ff5722',
+    green:   '#2e7d32',
+    purple:  '#7b1fa2',
+    blue:    '#1565c0',
+    cyan:    '#b2ebf2',
+    red:     '#d32f2f',
+    yellow:  '#ffeb3b',
+    magenta: '#e91e63',
+    gray:    '#9e9e9e',
+    pink:    '#ff8383',
+    black:   '#000000'
+};
+
 const GAMES = {
     'kanoodle': {
         name: 'Kanoodle',
+        gridType: 'square',
         cols: 11,
         rows: 5,
         pieces: [
-            { id: 'white',  color: '#ffffff', base: [[0,0], [1,0], [0,1]] },
-            { id: 'lime',   color: '#a2ca74', base: [[0,0], [1,0], [0,1], [1,1]] },
-            { id: 'orange', color: '#ff5722', base: [[0,0], [0,1], [0,2], [1,2]] },
-            { id: 'green',  color: '#2e7d32', base: [[1,0], [2,0], [0,1], [1,1], [3,0]] },
-            { id: 'purple', color: '#7b1fa2', base: [[0,0], [0,1], [0,2], [0,3]] },
-            { id: 'blue',   color: '#1565c0', base: [[0,0], [0,1], [0,2], [0,3], [1,3]] },
-            { id: 'cyan',   color: '#b2ebf2', base: [[0,0], [0,1], [0,2], [1,2], [2,2]] },
-            { id: 'red',    color: '#d32f2f', base: [[0,0], [1,0], [0,1], [1,1], [0,2]] },
-            { id: 'yellow', color: '#ffeb3b', base: [[0,0], [2,0], [0,1], [1,1], [2,1]] },
-            { id: 'pink',   color: '#e91e63', base: [[0,0], [0,1], [1,1], [1,2], [2,2]] },
-            { id: 'grey',   color: '#9e9e9e', base: [[1,0], [0,1], [1,1], [2,1], [1,2]] },
-            { id: 'peach',  color: '#ff8383', base: [[0,0], [1,0], [2,0], [3,0], [1,1]] }
+            { id: 'red',     base: [[0,0], [1,0], [0,1], [1,1], [0,2]] },
+            { id: 'orange',  base: [[0,0], [0,1], [0,2], [1,2]] },
+            { id: 'yellow',  base: [[0,0], [2,0], [0,1], [1,1], [2,1]] },
+            { id: 'lime',    base: [[0,0], [1,0], [0,1], [1,1]] },
+            { id: 'green',   base: [[1,0], [2,0], [0,1], [1,1], [3,0]] },
+            { id: 'cyan',    base: [[0,0], [0,1], [0,2], [1,2], [2,2]] },
+            { id: 'blue',    base: [[0,0], [0,1], [0,2], [0,3], [1,3]] },
+            { id: 'purple',  base: [[0,0], [0,1], [0,2], [0,3]] },
+            { id: 'magenta', base: [[0,0], [0,1], [1,1], [1,2], [2,2]] },
+            { id: 'pink',    base: [[0,0], [1,0], [2,0], [3,0], [1,1]] },
+            { id: 'white',   base: [[0,0], [1,0], [0,1]] },
+            { id: 'gray',    base: [[1,0], [0,1], [1,1], [2,1], [1,2]] }
+            
         ]
     },
     'kanoodle_jr': {
         name: 'Kanoodle Jr.',
+        gridType: 'square',
         cols: 5,
         rows: 5,
         pieces: [
-            { id: 'jr_green', color: '#2e7d32', base: [[0,0], [1,0], [0,1], [1,1], [0,2]] },
-            { id: 'jr_red', color: '#d32f2f', base: [[0,0], [0,1], [0,2], [1,2]] },
-            { id: 'jr_orange', color: '#ff5722', base: [[0,0], [1,0], [0,1]] },
-            { id: 'jr_blue', color: '#1565c0', base: [[0,0], [1,0], [1,1], [2,1]] },
-            { id: 'jr_yellow', color: '#ffeb3b', base: [[0,0], [1,0], [2,0], [1,1]] },
-            { id: 'jr_pink', color: '#e91e63', base: [[0,0], [0,1], [1,1], [1,2], [2,2]] }
+            { id: 'red',     base: [[0,0], [0,1], [0,2], [1,2]] },
+            { id: 'orange',  base: [[0,0], [1,0], [0,1]] },
+            { id: 'yellow',  base: [[0,0], [1,0], [2,0], [1,1]] },
+            { id: 'green',   base: [[0,0], [1,0], [0,1], [1,1], [0,2]] },
+            { id: 'blue',    base: [[0,0], [1,0], [1,1], [2,1]] },
+            { id: 'magenta', base: [[0,0], [0,1], [1,1], [1,2], [2,2]] }
+        ]
+    },
+    'kanoodle_extreme': {
+        name: 'Kanoodle Extreme',
+        gridType: 'triangular',
+        cols: 12,
+        rows: 5,
+        invalidCells: [0, 23, 47, 48],
+        pieces: [
+            { id: 'red',     base: [[0,0], [1,0], [2,0], [0,1], [1,1]] },
+            { id: 'orange',  base: [[0,1], [1,0], [2,0], [3,0]] },
+            { id: 'yellow',  base: [[1,0], [2,0], [3,0], [0,1], [1,1]]},
+            { id: 'lime',    base: [[3,1], [0,2], [1,2], [2,2], [0,3]]},
+            { id: 'green',   base: [[0,0], [2,0], [0,1], [1,1], [2,1]]},
+            { id: 'cyan',    base: [[0,0], [1,0], [2,0], [3,0], [2,1]]},
+            { id: 'blue',    base: [[0,0], [0,1], [0,2], [1,2], [2,2]]},
+            { id: 'purple',  base: [[0,0], [0,1], [0,2], [1,1]]},
+            { id: 'magenta', base: [[0,0], [1,0], [2,0], [3,0], [1,1]]},
+            { id: 'pink',    base: [[0,0], [1,0], [1,1], [2,1]]},
+            { id: 'white',   base: [[0,0], [1,0], [2,0], [1,1], [0,2]]},
+            { id: 'gray',    base: [[0,0], [1,0], [0,1], [1,1]]}
         ]
     }
 };
@@ -47,13 +87,21 @@ let MAX_SOLUTIONS = 1000;
 let PIECE_DEFS = [...GAMES[currentGame].pieces];
 
 const FAN_PIECE_DEFS = [
-    { id: 'black1', color: '#000000', base: [[0,1], [1,1], [2,1], [2,2], [0,0]] },     // 5-big S
-    { id: 'black2', color: '#000000', base: [[0,0], [1,0], [2,0], [1,1]] }             // 4-big T
+    { id: 'black1', base: [[0,1], [1,1], [2,1], [2,2], [0,0]] },  // 5-big S
+    { id: 'black2', base: [[0,0], [1,0], [2,0], [1,1]] }          // 4-big T
 ];
 
 // State Variables
 let boardState = new Array(TOTAL_CELLS).fill(0); 
 let startingBoardState = new Array(TOTAL_CELLS).fill(0);
+
+if (GAMES[currentGame].invalidCells) {
+    GAMES[currentGame].invalidCells.forEach(i => {
+        boardState[i] = -1;
+        startingBoardState[i] = -1;
+    });
+}
+
 let pieceVariations = {}; 
 let allSolutions = [];
 let currentSolutionIndex = -1;
@@ -80,6 +128,13 @@ function setGameType(gameId) {
     
     boardState = new Array(TOTAL_CELLS).fill(0);
     startingBoardState = new Array(TOTAL_CELLS).fill(0);
+    
+    if (GAMES[gameId].invalidCells) {
+        GAMES[gameId].invalidCells.forEach(i => {
+            boardState[i] = -1;
+            startingBoardState[i] = -1;
+        });
+    }
     
     usedPieces.clear();
     activePieceId = null;
