@@ -8,7 +8,7 @@ const MAX_SOLUTIONS = 1000;
 
 // The 12 shapes mapped as [x, y] coordinate offsets.
 // Total blocks sum to exactly 55.
-const PIECE_DEFS = [
+let PIECE_DEFS = [
     { id: 'white',  color: '#ffffff', base: [[0,0], [1,0], [0,1]] },                   // 3 blocks (Was orange)
     { id: 'lime',   color: '#a2ca74', base: [[0,0], [1,0], [0,1], [1,1]] },            // 4 blocks
     { id: 'orange', color: '#ff5722', base: [[0,0], [0,1], [0,2], [1,2]] },            // 4 blocks (Was beige)
@@ -23,6 +23,11 @@ const PIECE_DEFS = [
     { id: 'peach',  color: '#ff8383', base: [[0,0], [1,0], [2,0], [3,0], [1,1]] }      // 5 blocks
 ];
 
+const FAN_PIECE_DEFS = [
+    { id: 'black1', color: '#000000', base: [[0,1], [1,1], [2,1], [2,2], [0,0]] },     // 5-big S
+    { id: 'black2', color: '#000000', base: [[0,0], [1,0], [2,0], [1,1]] }             // 4-big T
+];
+
 // State Variables
 let boardState = new Array(TOTAL_CELLS).fill(0); 
 let startingBoardState = new Array(TOTAL_CELLS).fill(0);
@@ -35,6 +40,8 @@ let usedPieces = new Set();
 let activePieceId = null;
 let currentActiveShape = null; // Holds the real-time [[x,y]...] of the hovered piece
 let lastHoveredIndex = -1;
+let mouseX = 0;
+let mouseY = 0;
 
 // ==========================================
 // 2. GEOMETRY ENGINE
@@ -144,6 +151,10 @@ btnResetStart.innerText = 'Reset to Start';
 btnResetStart.style.display = 'none';
 document.getElementById('btn-reset').parentNode.insertBefore(btnResetStart, document.getElementById('btn-reset').nextSibling);
 
+const cursorPiece = document.createElement('div');
+cursorPiece.id = 'cursor-piece';
+document.body.appendChild(cursorPiece);
+
 function initializeUI() {
     precomputeVariations();
     
@@ -160,8 +171,11 @@ function initializeUI() {
         
         boardElement.appendChild(cell);
     }
+    
+    buildPalette();
+}
 
-    // Build Visual Palette
+function buildPalette() {
     const paletteContainer = document.getElementById('palette');
     paletteContainer.innerHTML = '';
     
@@ -188,6 +202,9 @@ function initializeUI() {
                 if (isFilled) {
                     cell.className = 'mini-cell';
                     cell.style.backgroundColor = piece.color;
+                    if (piece.color === '#000000') {
+                        cell.style.border = '1px solid #555';
+                    }
                 } else {
                     // Empty space filler
                     cell.style.width = '12px';
@@ -202,14 +219,83 @@ function initializeUI() {
     });
 }
 
+function setupFanToggle() {
+    const toggleContainer = document.createElement('div');
+    toggleContainer.style.display = 'flex';
+    toggleContainer.style.alignItems = 'center';
+    toggleContainer.style.justifyContent = 'center';
+    toggleContainer.style.gap = '8px';
+    toggleContainer.style.marginBottom = '15px';
+    toggleContainer.style.color = '#aaaaaa';
+
+    const fanToggle = document.createElement('input');
+    fanToggle.type = 'checkbox';
+    fanToggle.id = 'fan-edition-toggle';
+
+    const fanLabel = document.createElement('label');
+    fanLabel.htmlFor = 'fan-edition-toggle';
+    fanLabel.innerText = 'Enable Fan Edition Pieces (Black S & T)';
+    fanLabel.style.cursor = 'pointer';
+
+    toggleContainer.appendChild(fanToggle);
+    toggleContainer.appendChild(fanLabel);
+
+    const paletteContainer = document.getElementById('palette');
+    paletteContainer.parentNode.insertBefore(toggleContainer, paletteContainer);
+
+    fanToggle.addEventListener('change', (e) => {
+        toggleFanEdition(e.target.checked);
+    });
+}
+
+function toggleFanEdition(enabled) {
+    if (enabled) {
+        PIECE_DEFS.push(...FAN_PIECE_DEFS);
+    } else {
+        PIECE_DEFS = PIECE_DEFS.filter(p => !FAN_PIECE_DEFS.some(f => f.id === p.id));
+        
+        // Clean up any black pieces currently left on the board
+        for (let i = 0; i < TOTAL_CELLS; i++) {
+            if (FAN_PIECE_DEFS.some(f => f.id === boardState[i])) {
+                boardState[i] = 0;
+            }
+        }
+        FAN_PIECE_DEFS.forEach(f => usedPieces.delete(f.id));
+        
+        if (FAN_PIECE_DEFS.some(f => f.id === activePieceId)) {
+            activePieceId = null;
+            currentActiveShape = null;
+        }
+    }
+    
+    precomputeVariations();
+    buildPalette();
+    updatePaletteUI();
+    updateCursorPieceUI();
+    renderBoard();
+    
+    allSolutions = [];
+    currentSolutionIndex = -1;
+    updateNavUI();
+    btnSolve.innerText = "Find All Solutions";
+    btnSolve.disabled = false;
+    btnResetStart.style.display = 'none';
+}
+
 function renderBoard() {
     for (let i = 0; i < TOTAL_CELLS; i++) {
         const cellUi = document.getElementById(`cell-${i}`);
         if (boardState[i] === 0) {
             cellUi.style.backgroundColor = '#4a4a4a'; 
+            cellUi.style.border = 'none';
         } else {
             const pieceDef = PIECE_DEFS.find(p => p.id === boardState[i]);
             cellUi.style.backgroundColor = pieceDef.color; 
+            if (pieceDef.color === '#000000') {
+                cellUi.style.border = '2px solid #555';
+            } else {
+                cellUi.style.border = 'none';
+            }
         }
     }
 }
@@ -228,6 +314,7 @@ function selectPiece(pieceId) {
         currentActiveShape = normalizeShape([...pieceDef.base]);
     }
     updatePaletteUI();
+    updateCursorPieceUI();
 }
 
 function updatePaletteUI() {
@@ -242,12 +329,14 @@ function updatePaletteUI() {
 function actionRotate() {
     if (!activePieceId || !currentActiveShape) return;
     currentActiveShape = normalizeShape(rotateShape(currentActiveShape));
+    updateCursorPieceUI();
     if (lastHoveredIndex !== -1) handleHover(lastHoveredIndex); 
 }
 
 function actionFlip() {
     if (!activePieceId || !currentActiveShape) return;
     currentActiveShape = normalizeShape(flipShape(currentActiveShape));
+    updateCursorPieceUI();
     if (lastHoveredIndex !== -1) handleHover(lastHoveredIndex); 
 }
 
@@ -308,10 +397,56 @@ function handleClick(index) {
             activePieceId = null; 
             currentActiveShape = null;
             updatePaletteUI();
+            updateCursorPieceUI();
             renderBoard();
             clearHoverVisuals();
         }
     }
+}
+
+function updateCursorPieceUI() {
+    if (!activePieceId || !currentActiveShape) {
+        cursorPiece.style.display = 'none';
+        return;
+    }
+    cursorPiece.style.display = 'grid';
+    const pieceDef = PIECE_DEFS.find(p => p.id === activePieceId);
+    
+    let minX = 0, maxX = 0, minY = 0, maxY = 0;
+    currentActiveShape.forEach(pt => {
+        if (pt[0] < minX) minX = pt[0];
+        if (pt[0] > maxX) maxX = pt[0];
+        if (pt[1] < minY) minY = pt[1];
+        if (pt[1] > maxY) maxY = pt[1];
+    });
+    
+    cursorPiece.style.gridTemplateColumns = `repeat(${maxX - minX + 1}, 45px)`;
+    cursorPiece.style.gridTemplateRows = `repeat(${maxY - minY + 1}, 45px)`;
+    cursorPiece.innerHTML = '';
+    
+    for (let y = minY; y <= maxY; y++) {
+        for (let x = minX; x <= maxX; x++) {
+            const cell = document.createElement('div');
+            if (currentActiveShape.some(pt => pt[0] === x && pt[1] === y)) {
+                cell.style.width = '45px';
+                cell.style.height = '45px';
+                cell.style.backgroundColor = pieceDef.color;
+                cell.style.borderRadius = '50%';
+                cell.style.opacity = '0.8';
+                if (pieceDef.color === '#000000') {
+                    cell.style.border = '2px solid #555';
+                }
+            }
+            cursorPiece.appendChild(cell);
+        }
+    }
+    
+    // Offset so the "root" block (0,0) is exactly centered on the cursor tip
+    const centerX = (-minX * 53) + 22.5; // 45px width + 8px gap = 53px spacing. 22.5px is half the 45px cell.
+    const centerY = (-minY * 53) + 22.5;
+    cursorPiece.style.transform = `translate(-${centerX}px, -${centerY}px)`;
+    cursorPiece.style.left = mouseX + 'px';
+    cursorPiece.style.top = mouseY + 'px';
 }
 
 // --- Solution Navigation ---
@@ -345,6 +480,7 @@ document.addEventListener('keydown', (e) => {
         activePieceId = null; 
         currentActiveShape = null;
         updatePaletteUI(); 
+        updateCursorPieceUI();
         clearHoverVisuals(); 
     }
 });
@@ -360,8 +496,18 @@ document.getElementById('btn-reset').addEventListener('click', () => {
     btnSolve.disabled = false;
     btnResetStart.style.display = 'none';
     updatePaletteUI();
+    updateCursorPieceUI();
     updateNavUI();
     renderBoard();
+});
+
+document.addEventListener('mousemove', (e) => {
+    mouseX = e.clientX;
+    mouseY = e.clientY;
+    if (activePieceId) {
+        cursorPiece.style.left = mouseX + 'px';
+        cursorPiece.style.top = mouseY + 'px';
+    }
 });
 
 btnSolve.addEventListener('click', () => {
@@ -408,5 +554,6 @@ btnResetStart.addEventListener('click', () => {
 });
 
 // Boot up
+setupFanToggle();
 initializeUI();
 renderBoard();

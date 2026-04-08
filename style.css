@@ -150,3 +150,12 @@ button:disabled {
     height: 12px;
     border-radius: 50%;
 }
+
+/* Floating Cursor Piece */
+#cursor-piece {
+    position: fixed;
+    pointer-events: none; /* Let clicks pass through */
+    z-index: 1000;
+    display: none;
+    gap: 8px; /* Match board gap */
+}
