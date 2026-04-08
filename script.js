@@ -1,145 +1,5 @@
-// ==========================================
-// 1. GAME CONSTANTS & PIECE DATA
-// ==========================================
-const BOARD_COLS = 11;
-const BOARD_ROWS = 5;
-const TOTAL_CELLS = BOARD_COLS * BOARD_ROWS; 
-const MAX_SOLUTIONS = 1000; 
+/* Note: Ensure state.js and solver.js are loaded before script.js in your HTML */
 
-// The 12 shapes mapped as [x, y] coordinate offsets.
-// Total blocks sum to exactly 55.
-let PIECE_DEFS = [
-    { id: 'white',  color: '#ffffff', base: [[0,0], [1,0], [0,1]] },                   // 3 blocks (Was orange)
-    { id: 'lime',   color: '#a2ca74', base: [[0,0], [1,0], [0,1], [1,1]] },            // 4 blocks
-    { id: 'orange', color: '#ff5722', base: [[0,0], [0,1], [0,2], [1,2]] },            // 4 blocks (Was beige)
-    { id: 'green',  color: '#2e7d32', base: [[1,0], [2,0], [0,1], [1,1], [3,0]] },     // 5 blocks (Z-shape extended)
-    { id: 'purple', color: '#7b1fa2', base: [[0,0], [0,1], [0,2], [0,3]] },            // 4 blocks (Shortened to 4)
-    { id: 'blue',   color: '#1565c0', base: [[0,0], [0,1], [0,2], [0,3], [1,3]] },     // 5 blocks
-    { id: 'cyan',   color: '#b2ebf2', base: [[0,0], [0,1], [0,2], [1,2], [2,2]] },     // 5 blocks
-    { id: 'red',    color: '#d32f2f', base: [[0,0], [1,0], [0,1], [1,1], [0,2]] },     // 5 blocks
-    { id: 'yellow', color: '#ffeb3b', base: [[0,0], [2,0], [0,1], [1,1], [2,1]] },     // 5 blocks
-    { id: 'pink',   color: '#e91e63', base: [[0,0], [0,1], [1,1], [1,2], [2,2]] },     // 5 blocks
-    { id: 'grey',   color: '#9e9e9e', base: [[1,0], [0,1], [1,1], [2,1], [1,2]] },     // 5 blocks
-    { id: 'peach',  color: '#ff8383', base: [[0,0], [1,0], [2,0], [3,0], [1,1]] }      // 5 blocks
-];
-
-const FAN_PIECE_DEFS = [
-    { id: 'black1', color: '#000000', base: [[0,1], [1,1], [2,1], [2,2], [0,0]] },     // 5-big S
-    { id: 'black2', color: '#000000', base: [[0,0], [1,0], [2,0], [1,1]] }             // 4-big T
-];
-
-// State Variables
-let boardState = new Array(TOTAL_CELLS).fill(0); 
-let startingBoardState = new Array(TOTAL_CELLS).fill(0);
-let pieceVariations = {}; 
-let allSolutions = [];
-let currentSolutionIndex = -1;
-
-// Manual Placement State
-let usedPieces = new Set();
-let activePieceId = null;
-let currentActiveShape = null; // Holds the real-time [[x,y]...] of the hovered piece
-let lastHoveredIndex = -1;
-let mouseX = 0;
-let mouseY = 0;
-
-// ==========================================
-// 2. GEOMETRY ENGINE
-// ==========================================
-function normalizeShape(shape) {
-    shape.sort((a, b) => (a[1] !== b[1]) ? (a[1] - b[1]) : (a[0] - b[0]));
-    const rootX = shape[0][0];
-    const rootY = shape[0][1];
-    return shape.map(pt => [pt[0] - rootX, pt[1] - rootY]);
-}
-
-function rotateShape(shape) { return shape.map(pt => [-pt[1], pt[0]]); }
-function flipShape(shape) { return shape.map(pt => [-pt[0], pt[1]]); }
-
-function precomputeVariations() {
-    PIECE_DEFS.forEach(piece => {
-        let uniqueShapes = new Set();
-        let variations = [];
-        let currentShape = piece.base;
-
-        for (let flip = 0; flip < 2; flip++) {
-            for (let rot = 0; rot < 4; rot++) {
-                currentShape = rotateShape(currentShape);
-                let normalized = normalizeShape([...currentShape]);
-                let shapeString = JSON.stringify(normalized);
-                if (!uniqueShapes.has(shapeString)) {
-                    uniqueShapes.add(shapeString);
-                    variations.push(normalized);
-                }
-            }
-            currentShape = flipShape(currentShape);
-        }
-        pieceVariations[piece.id] = variations;
-    });
-}
-
-// ==========================================
-// 3. CORE LOGIC
-// ==========================================
-function canPlace(board, emptyIndex, shape) {
-    const rootX = emptyIndex % BOARD_COLS;
-    const rootY = Math.floor(emptyIndex / BOARD_COLS);
-    for (let pt of shape) {
-        const x = rootX + pt[0];
-        const y = rootY + pt[1];
-        if (x < 0 || x >= BOARD_COLS || y < 0 || y >= BOARD_ROWS) return false;
-        const targetIndex = y * BOARD_COLS + x;
-        if (board[targetIndex] !== 0) return false;
-    }
-    return true;
-}
-
-function placePiece(board, emptyIndex, shape, pieceId) {
-    const rootX = emptyIndex % BOARD_COLS;
-    const rootY = Math.floor(emptyIndex / BOARD_COLS);
-    for (let pt of shape) {
-        board[(rootY + pt[1]) * BOARD_COLS + (rootX + pt[0])] = pieceId;
-    }
-}
-
-function removePiece(board, emptyIndex, shape) {
-    const rootX = emptyIndex % BOARD_COLS;
-    const rootY = Math.floor(emptyIndex / BOARD_COLS);
-    for (let pt of shape) {
-        board[(rootY + pt[1]) * BOARD_COLS + (rootX + pt[0])] = 0;
-    }
-}
-
-function solveRecursive(board, remainingPieces) {
-    let emptyIndex = 0;
-    while (emptyIndex < TOTAL_CELLS && board[emptyIndex] !== 0) { emptyIndex++; }
-
-    if (emptyIndex === TOTAL_CELLS) {
-        allSolutions.push([...board]); 
-        if (allSolutions.length >= MAX_SOLUTIONS) return true; 
-        return false; 
-    }
-
-    for (let i = 0; i < remainingPieces.length; i++) {
-        let piece = remainingPieces[i];
-        let variations = pieceVariations[piece.id];
-
-        for (let shape of variations) {
-            if (canPlace(board, emptyIndex, shape)) {
-                placePiece(board, emptyIndex, shape, piece.id);
-                let nextPieces = remainingPieces.filter(p => p.id !== piece.id);
-                
-                if (solveRecursive(board, nextPieces)) return true; 
-                removePiece(board, emptyIndex, shape);
-            }
-        }
-    }
-    return false;
-}
-
-// ==========================================
-// 4. UI & INTERACTION
-// ==========================================
 const boardElement = document.getElementById('board');
 const navContainer = document.getElementById('solution-nav');
 const counterText = document.getElementById('solution-counter');
@@ -155,11 +15,66 @@ const cursorPiece = document.createElement('div');
 cursorPiece.id = 'cursor-piece';
 document.body.appendChild(cursorPiece);
 
+function setupGameSelector() {
+    const selectorContainer = document.createElement('div');
+    selectorContainer.style.marginBottom = '20px';
+    selectorContainer.style.display = 'flex';
+    selectorContainer.style.gap = '10px';
+    selectorContainer.style.alignItems = 'center';
+    selectorContainer.style.justifyContent = 'center';
+    
+    const label = document.createElement('label');
+    label.innerText = 'Select Game: ';
+    label.style.fontWeight = 'bold';
+    
+    const select = document.createElement('select');
+    select.id = 'game-selector';
+    select.style.padding = '5px 10px';
+    select.style.borderRadius = '4px';
+    select.style.backgroundColor = '#1a1a1a';
+    select.style.color = '#fff';
+    select.style.border = '1px solid #4a4a4a';
+    
+    Object.keys(GAMES).forEach(gameId => {
+        const option = document.createElement('option');
+        option.value = gameId;
+        option.innerText = GAMES[gameId].name;
+        select.appendChild(option);
+    });
+    
+    select.addEventListener('change', (e) => {
+        setGameType(e.target.value);
+        
+        const fanToggleContainer = document.getElementById('fan-edition-toggle').parentNode;
+        if (e.target.value === 'kanoodle') {
+            fanToggleContainer.style.display = 'flex';
+        } else {
+            fanToggleContainer.style.display = 'none';
+            document.getElementById('fan-edition-toggle').checked = false;
+        }
+        
+        initializeUI();
+        renderBoard();
+        
+        btnSolve.innerText = "Find All Solutions";
+        btnSolve.disabled = false;
+        btnResetStart.style.display = 'none';
+        updateNavUI();
+        updateCursorPieceUI();
+    });
+    
+    selectorContainer.appendChild(label);
+    selectorContainer.appendChild(select);
+    
+    boardElement.parentNode.insertBefore(selectorContainer, boardElement);
+}
+
 function initializeUI() {
     precomputeVariations();
     
     // Build Board
     boardElement.innerHTML = ''; 
+    boardElement.style.gridTemplateColumns = `repeat(${BOARD_COLS}, 45px)`; // Dynamically set shape width
     for (let i = 0; i < TOTAL_CELLS; i++) {
         const cell = document.createElement('div');
         cell.classList.add('cell');
@@ -555,5 +470,6 @@ btnResetStart.addEventListener('click', () => {
 
 // Boot up
 setupFanToggle();
+setupGameSelector();
 initializeUI();
 renderBoard();

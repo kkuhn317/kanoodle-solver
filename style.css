@@ -24,8 +24,8 @@ body {
 /* The Board Grid */
 .board {
     display: grid;
-    /* 11 columns, auto width */
-    grid-template-columns: repeat(11, 45px);
+    /* Grid columns are now handled dynamically via javascript in initializeUI() */
+    /* grid-template-columns: repeat(11, 45px); */
     gap: 8px;
     background-color: #1a1a1a;
     padding: 20px;
