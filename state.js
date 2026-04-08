@@ -120,10 +120,17 @@ let MAX_SOLUTIONS = 1000;
 // The pieces mapped as [x, y] coordinate offsets.
 let PIECE_DEFS = [...GAMES[currentGame].pieces];
 
-const FAN_PIECE_DEFS = [
-    { id: 'black1', base: [[0,1], [1,1], [2,1], [2,2], [0,0]] },  // 5-big S
-    { id: 'black2', base: [[0,0], [1,0], [2,0], [1,1]] }          // 4-big T
-];
+const FAN_EDITIONS = {
+    cyan: [
+        { id: 'black1', base: [[0,1], [1,1], [2,1], [2,2], [0,0]] },  // 5-big S
+        { id: 'black2', base: [[0,0], [1,0], [2,0], [1,1]] }          // 4-big T
+    ],
+    magenta: [
+        // You can update these with the correct shapes when you get them!
+        { id: 'black1', base: [[0,0], [0,1], [1,1], [2,1], [1,2]] },
+        { id: 'black2', base: [[0,0], [1,0], [1,1], [2,1]] }
+    ]
+};
 
 // State Variables
 let boardState = new Array(TOTAL_CELLS).fill(0); 

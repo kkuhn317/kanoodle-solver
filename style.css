@@ -149,3 +149,20 @@ button:disabled {
     z-index: 1000;
     display: none;
 }
+
+/* Blocker Tool Styling */
+.blocker-style {
+    background-color: #222 !important;
+    border: 2px dashed #888 !important;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    color: #888 !important;
+    font-weight: bold;
+    font-size: 20px;
+    box-sizing: border-box;
+}
+
+.blocker-style::after {
+    content: 'X';
+}

@@ -43,12 +43,12 @@ function setupGameSelector() {
     select.addEventListener('change', (e) => {
         setGameType(e.target.value);
         
-        const fanToggleContainer = document.getElementById('fan-edition-toggle').parentNode;
+        const fanToggleContainer = document.getElementById('fan-edition-select').parentNode;
         if (e.target.value === 'kanoodle') {
             fanToggleContainer.style.display = 'flex';
         } else {
             fanToggleContainer.style.display = 'none';
-            document.getElementById('fan-edition-toggle').checked = false;
+            document.getElementById('fan-edition-select').value = 'none';
         }
         
         initializeUI();
@@ -187,6 +187,12 @@ function buildPalette() {
         btn.addEventListener('click', () => selectPiece(piece.id));
         paletteContainer.appendChild(btn);
     });
+
+    const blockerBtn = document.createElement('div');
+    blockerBtn.className = 'palette-piece blocker-style';
+    blockerBtn.id = 'palette-blocker';
+    blockerBtn.addEventListener('click', () => selectPiece('blocker'));
+    paletteContainer.appendChild(blockerBtn);
 }
 
 function setupFanToggle() {
@@ -198,52 +204,63 @@ function setupFanToggle() {
     toggleContainer.style.marginBottom = '15px';
     toggleContainer.style.color = '#aaaaaa';
 
-    const fanToggle = document.createElement('input');
-    fanToggle.type = 'checkbox';
-    fanToggle.id = 'fan-edition-toggle';
-
     const fanLabel = document.createElement('label');
-    fanLabel.htmlFor = 'fan-edition-toggle';
-    fanLabel.innerText = 'Enable Fan Edition Pieces (Black S & T)';
-    fanLabel.style.cursor = 'pointer';
+    fanLabel.htmlFor = 'fan-edition-select';
+    fanLabel.innerText = 'Fan Edition Pieces:';
+    fanLabel.style.fontWeight = 'bold';
 
-    toggleContainer.appendChild(fanToggle);
+    const fanSelect = document.createElement('select');
+    fanSelect.id = 'fan-edition-select';
+    fanSelect.style.padding = '5px 10px';
+    fanSelect.style.borderRadius = '4px';
+    fanSelect.style.backgroundColor = '#1a1a1a';
+    fanSelect.style.color = '#fff';
+    fanSelect.style.border = '1px solid #4a4a4a';
+    
+    fanSelect.innerHTML = `
+        <option value="none">None</option>
+        <option value="cyan">Cyan Edition</option>
+        <option value="magenta">Magenta Edition</option>
+    `;
+
     toggleContainer.appendChild(fanLabel);
+    toggleContainer.appendChild(fanSelect);
 
     const paletteContainer = document.getElementById('palette');
     paletteContainer.parentNode.insertBefore(toggleContainer, paletteContainer);
 
-    fanToggle.addEventListener('change', (e) => {
-        toggleFanEdition(e.target.checked);
+    fanSelect.addEventListener('change', (e) => {
+        toggleFanEdition(e.target.value);
     });
 }
 
-function toggleFanEdition(enabled) {
+function toggleFanEdition(edition) {
     let wasSolving = isSolving;
     if (isSolving) isSolving = false;
     if (allSolutions.length > 0 || wasSolving) {
         boardState = [...startingBoardState];
     }
+    const allFanIds = ['black1', 'black2'];
 
-    if (enabled) {
-        PIECE_DEFS.push(...FAN_PIECE_DEFS);
-    } else {
-        PIECE_DEFS = PIECE_DEFS.filter(p => !FAN_PIECE_DEFS.some(f => f.id === p.id));
-        
-        // Clean up any black pieces currently left on the board
-        for (let i = 0; i < TOTAL_CELLS; i++) {
-            if (FAN_PIECE_DEFS.some(f => f.id === boardState[i])) {
-                boardState[i] = 0;
-            }
+    PIECE_DEFS = PIECE_DEFS.filter(p => !allFanIds.includes(p.id));
+    
+    // Clean up any black pieces currently left on the board
+    for (let i = 0; i < TOTAL_CELLS; i++) {
+        if (allFanIds.includes(boardState[i])) {
+            boardState[i] = 0;
         }
-        FAN_PIECE_DEFS.forEach(f => usedPieces.delete(f.id));
-        
-        if (FAN_PIECE_DEFS.some(f => f.id === activePieceId)) {
-            activePieceId = null;
-            currentActiveShape = null;
-        }
-        
-        conditions = conditions.filter(c => !FAN_PIECE_DEFS.some(f => c.pieces.includes(f.id)));
+    }
+    allFanIds.forEach(id => usedPieces.delete(id));
+    
+    if (allFanIds.includes(activePieceId)) {
+        activePieceId = null;
+        currentActiveShape = null;
+    }
+    
+    conditions = conditions.filter(c => !allFanIds.some(id => c.pieces.includes(id)));
+
+    if (edition !== 'none') {
+        PIECE_DEFS.push(...FAN_EDITIONS[edition]);
     }
     
     precomputeVariations();
@@ -267,9 +284,15 @@ function renderBoard() {
         const cellUi = document.getElementById(`cell-${i}`);
         if (!cellUi || boardState[i] === -1) continue;
         
+        cellUi.classList.remove('blocker-style');
+        
         if (boardState[i] === 0) {
             cellUi.style.backgroundColor = '#4a4a4a'; 
             cellUi.style.border = 'none';
+        } else if (boardState[i] === 'blocker') {
+            cellUi.classList.add('blocker-style');
+            cellUi.style.backgroundColor = '';
+            cellUi.style.border = '';
         } else {
             const pieceDef = PIECE_DEFS.find(p => p.id === boardState[i]);
             const pieceColor = COLORS[pieceDef.id.replace(/[0-9]/g, '')];
@@ -287,30 +310,36 @@ function renderBoard() {
 function selectPiece(pieceId) {
     if (isSolving) return;
     if (allSolutions.length > 0) return;
-    if (usedPieces.has(pieceId)) return; 
+    if (pieceId !== 'blocker' && usedPieces.has(pieceId)) return; 
     
     if (activePieceId === pieceId) {
         activePieceId = null; 
         currentActiveShape = null;
     } else {
         activePieceId = pieceId;
-        const pieceDef = PIECE_DEFS.find(p => p.id === pieceId);
-        // Load the base shape to start
-        currentActiveShape = normalizeShape([...pieceDef.base]);
+        if (pieceId === 'blocker') {
+            currentActiveShape = [[0,0]];
+        } else {
+            const pieceDef = PIECE_DEFS.find(p => p.id === pieceId);
+            // Load the base shape to start
+            currentActiveShape = normalizeShape([...pieceDef.base]);
+        }
     }
     updatePaletteUI();
     updateCursorPieceUI();
 }
 
 function updatePaletteUI() {
-    PIECE_DEFS.forEach(piece => {
-        const btn = document.getElementById(`palette-${piece.id}`);
+    const allPieceIds = PIECE_DEFS.map(p => p.id).concat(['blocker']);
+    allPieceIds.forEach(id => {
+        const btn = document.getElementById(`palette-${id}`);
+        if (!btn) return;
         btn.classList.remove('selected', 'used');
         if (allSolutions.length > 0) {
             btn.classList.add('used');
-        } else if (usedPieces.has(piece.id)) {
+        } else if (id !== 'blocker' && usedPieces.has(id)) {
             btn.classList.add('used');
-        } else if (activePieceId === piece.id) {
+        } else if (activePieceId === id) {
             btn.classList.add('selected');
         }
     });
@@ -318,7 +347,7 @@ function updatePaletteUI() {
 
 function actionRotate() {
     if (isSolving) return;
-    if (!activePieceId || !currentActiveShape) return;
+    if (!activePieceId || !currentActiveShape || activePieceId === 'blocker') return;
     const gridType = GAMES[currentGame].gridType || 'square';
     currentActiveShape = normalizeShape(gridType === 'triangular' ? rotateHex(currentActiveShape) : rotateShape(currentActiveShape));
     updateCursorPieceUI();
@@ -327,7 +356,7 @@ function actionRotate() {
 
 function actionFlip() {
     if (isSolving) return;
-    if (!activePieceId || !currentActiveShape) return;
+    if (!activePieceId || !currentActiveShape || activePieceId === 'blocker') return;
     const gridType = GAMES[currentGame].gridType || 'square';
     currentActiveShape = normalizeShape(gridType === 'triangular' ? flipHex(currentActiveShape) : flipShape(currentActiveShape));
     updateCursorPieceUI();
@@ -384,10 +413,14 @@ function handleClick(index) {
     // 1. Remove piece if clicked on occupied cell
     if (boardState[index] !== 0) {
         const clickedPieceId = boardState[index];
-        for (let i = 0; i < TOTAL_CELLS; i++) {
-            if (boardState[i] === clickedPieceId) boardState[i] = 0;
+        if (clickedPieceId === 'blocker') {
+            boardState[index] = 0;
+        } else {
+            for (let i = 0; i < TOTAL_CELLS; i++) {
+                if (boardState[i] === clickedPieceId) boardState[i] = 0;
+            }
+            usedPieces.delete(clickedPieceId);
         }
-        usedPieces.delete(clickedPieceId);
         updatePaletteUI();
         renderBoard();
         clearHoverVisuals();
@@ -398,9 +431,11 @@ function handleClick(index) {
     if (activePieceId && currentActiveShape) {
         if (canPlace(boardState, index, currentActiveShape)) {
             placePiece(boardState, index, currentActiveShape, activePieceId);
-            usedPieces.add(activePieceId);
-            activePieceId = null; 
-            currentActiveShape = null;
+            if (activePieceId !== 'blocker') {
+                usedPieces.add(activePieceId);
+                activePieceId = null; 
+                currentActiveShape = null;
+            }
             updatePaletteUI();
             updateCursorPieceUI();
             renderBoard();
@@ -415,6 +450,26 @@ function updateCursorPieceUI() {
         return;
     }
     
+    if (activePieceId === 'blocker') {
+        cursorPiece.style.display = 'block';
+        cursorPiece.innerHTML = '';
+        cursorPiece.style.width = '45px';
+        cursorPiece.style.height = '45px';
+        const cell = document.createElement('div');
+        cell.className = 'blocker-style';
+        cell.style.position = 'absolute';
+        cell.style.width = '45px';
+        cell.style.height = '45px';
+        cell.style.borderRadius = '50%';
+        cell.style.opacity = '0.8';
+        cursorPiece.appendChild(cell);
+        
+        cursorPiece.style.transform = `translate(-22.5px, -22.5px)`;
+        cursorPiece.style.left = mouseX + 'px';
+        cursorPiece.style.top = mouseY + 'px';
+        return;
+    }
+
     const gridType = GAMES[currentGame].gridType || 'square';
     const cellW = 45, gap = 8;
     const space = cellW + gap;
@@ -557,10 +612,14 @@ btnSolve.addEventListener('click', async () => {
     // Validate starting board against conditions
     let startingValid = true;
     for (let cond of conditions) {
-        if (boardState.includes(cond.pieces[0]) && boardState.includes(cond.pieces[1])) {
-            let touching = arePiecesTouching(boardState, cond.pieces[0], cond.pieces[1]);
-            if (cond.type === 'must_touch' && !touching) startingValid = false;
-            if (cond.type === 'cannot_touch' && touching) startingValid = false;
+        if (cond.type === 'do_not_use') {
+            if (boardState.includes(cond.pieces[0])) startingValid = false;
+        } else {
+            if (boardState.includes(cond.pieces[0]) && boardState.includes(cond.pieces[1])) {
+                let touching = arePiecesTouching(boardState, cond.pieces[0], cond.pieces[1]);
+                if (cond.type === 'must_touch' && !touching) startingValid = false;
+                if (cond.type === 'cannot_touch' && touching) startingValid = false;
+            }
         }
     }
     
@@ -577,12 +636,21 @@ btnSolve.addEventListener('click', async () => {
         updatePaletteUI();
     }
 
+    let doNotUsePieces = conditions.filter(c => c.type === 'do_not_use').map(c => c.pieces[0]);
+    let remainingPieces = PIECE_DEFS.filter(p => !usedPieces.has(p.id) && !doNotUsePieces.includes(p.id));
+    
+    let emptyCells = boardState.filter(cell => cell === 0).length;
+    let availableBlocks = remainingPieces.reduce((sum, p) => sum + p.base.length, 0);
+    
+    if (availableBlocks < emptyCells) {
+        alert("Not enough valid pieces remaining to fill the empty spaces on the board!");
+        return;
+    }
+
     isSolving = true;
     btnSolve.innerText = "Stop (Found 0)";
     startingBoardState = [...boardState];
     allSolutions = [];
-    
-    let remainingPieces = PIECE_DEFS.filter(p => !usedPieces.has(p.id));
     
     // Wait a brief moment so the UI can update the button text
     await new Promise(r => setTimeout(r, 10));

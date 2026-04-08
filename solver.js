@@ -105,6 +105,8 @@ function arePiecesTouching(board, p1, p2) {
 
 function isPlacementValidForConditions(board, placedPieceId) {
     for (let cond of conditions) {
+        if (cond.type === 'do_not_use') continue; // Handled pre-flight
+        
         if (cond.pieces.includes(placedPieceId)) {
             let otherPieceId = cond.pieces[0] === placedPieceId ? cond.pieces[1] : cond.pieces[0];
             if (board.includes(otherPieceId)) {

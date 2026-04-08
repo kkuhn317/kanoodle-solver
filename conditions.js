@@ -36,10 +36,15 @@ function setupConditionsUI() {
     typeSelect.innerHTML = `
         <option value="must_touch">Must Touch</option>
         <option value="cannot_touch">Cannot Touch</option>
+        <option value="do_not_use">Do Not Use</option>
     `;
     
     const p2Select = document.createElement('select');
     p2Select.id = 'cond-piece2';
+
+    typeSelect.addEventListener('change', (e) => {
+        p2Select.style.display = e.target.value === 'do_not_use' ? 'none' : 'inline-block';
+    });
 
     const btnAdd = document.createElement('button');
     btnAdd.innerText = 'Add';
@@ -47,15 +52,23 @@ function setupConditionsUI() {
         const p1 = p1Select.value;
         const p2 = p2Select.value;
         const type = typeSelect.value;
-        if (p1 === p2) {
+        if (type !== 'do_not_use' && p1 === p2) {
             alert('Please select two different pieces.');
             return;
         }
-        if (conditions.some(c => (c.pieces.includes(p1) && c.pieces.includes(p2)))) {
-            alert('A condition between these pieces already exists. Remove it first.');
-            return;
+        if (type === 'do_not_use') {
+            if (conditions.some(c => c.type === 'do_not_use' && c.pieces[0] === p1)) {
+                alert('A condition for this piece already exists. Remove it first.');
+                return;
+            }
+            conditions.push({ type, pieces: [p1] });
+        } else {
+            if (conditions.some(c => c.type !== 'do_not_use' && (c.pieces.includes(p1) && c.pieces.includes(p2)))) {
+                alert('A condition between these pieces already exists. Remove it first.');
+                return;
+            }
+            conditions.push({ type, pieces: [p1, p2] });
         }
-        conditions.push({ type, pieces: [p1, p2] });
         renderConditions();
     });
 
@@ -132,9 +145,14 @@ function renderConditions() {
             return colorHex ? (colorHex === '#000000' ? '#aaaaaa' : colorHex) : '#fff';
         };
         
-        text.innerHTML = `<span style="color:${getPieceColor(cond.pieces[0])}; font-weight:bold;">${cond.pieces[0]}</span> 
-                          <span style="color:#888; font-size:0.9em; margin:0 5px;">${actionStr}</span> 
-                          <span style="color:${getPieceColor(cond.pieces[1])}; font-weight:bold;">${cond.pieces[1]}</span>`;
+        if (cond.type === 'do_not_use') {
+            text.innerHTML = `<span style="color:#888; font-size:0.9em; margin:0 5px;">DO NOT USE</span>
+                              <span style="color:${getPieceColor(cond.pieces[0])}; font-weight:bold;">${cond.pieces[0]}</span>`;
+        } else {
+            text.innerHTML = `<span style="color:${getPieceColor(cond.pieces[0])}; font-weight:bold;">${cond.pieces[0]}</span> 
+                              <span style="color:#888; font-size:0.9em; margin:0 5px;">${actionStr}</span> 
+                              <span style="color:${getPieceColor(cond.pieces[1])}; font-weight:bold;">${cond.pieces[1]}</span>`;
+        }
         
         const btnRemove = document.createElement('button');
         btnRemove.innerText = 'Remove';
