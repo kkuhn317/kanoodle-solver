@@ -581,7 +581,6 @@ document.getElementById('btn-reset').addEventListener('click', () => {
     allSolutions = [];
     currentSolutionIndex = -1;
     solverIterations = 0;
-    firstSolutionIterations = 0;
     difficultyRating = "";
     btnSolve.innerText = "Find All Solutions";
     btnSolve.disabled = false;
@@ -664,7 +663,6 @@ btnSolve.addEventListener('click', async () => {
     startingBoardState = [...boardState];
     allSolutions = [];
     solverIterations = 0;
-    firstSolutionIterations = 0;
     difficultyRating = "";
     
     // Wait a brief moment so the UI can update the button text
@@ -677,16 +675,17 @@ btnSolve.addEventListener('click', async () => {
     const wasAborted = !isSolving;
     isSolving = false;
 
-    let iters = allSolutions.length > 0 ? firstSolutionIterations : solverIterations;
+    let avgIters = allSolutions.length > 0 ? Math.floor(solverIterations / allSolutions.length) : solverIterations;
     let diffName = "";
     let diffColor = "";
-    if (iters < 500) { diffName = "Trivial"; diffColor = COLORS.lime; }
-    else if (iters < 5000) { diffName = "Easy"; diffColor = COLORS.green; }
-    else if (iters < 50000) { diffName = "Medium"; diffColor = COLORS.yellow; }
-    else if (iters < 500000) { diffName = "Hard"; diffColor = COLORS.orange; }
+    if (avgIters < 500) { diffName = "Trivial"; diffColor = COLORS.lime; }
+    else if (avgIters < 5000) { diffName = "Easy"; diffColor = COLORS.green; }
+    else if (avgIters < 50000) { diffName = "Medium"; diffColor = COLORS.yellow; }
+    else if (avgIters < 500000) { diffName = "Hard"; diffColor = COLORS.orange; }
     else { diffName = "Extreme"; diffColor = COLORS.red; }
     
-    difficultyRating = `Difficulty: <strong style="color:${diffColor}">${diffName}</strong> <span style="color:#888; font-size:0.9em; margin-left:8px;">(${iters.toLocaleString()} steps)</span>`;
+    let stepText = allSolutions.length > 1 ? `(~${avgIters.toLocaleString()} steps/sol)` : `(${avgIters.toLocaleString()} steps)`;
+    difficultyRating = `Difficulty: <strong style="color:${diffColor}">${diffName}</strong> <span style="color:#888; font-size:0.9em; margin-left:8px;">${stepText}</span>`;
 
     if (allSolutions.length >= MAX_SOLUTIONS) {
         btnSolve.innerText = `Found ${MAX_SOLUTIONS}+ Solutions (Capped)`;

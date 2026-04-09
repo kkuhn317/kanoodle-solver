@@ -186,9 +186,6 @@ async function solveRecursive(board, remainingPieces, onProgress) {
                 }
             }
         }
-        if (allSolutions.length === 0) {
-            firstSolutionIterations = solverIterations;
-        }
         allSolutions.push([...board]); 
         if (onProgress) onProgress(); 
         if (allSolutions.length >= MAX_SOLUTIONS) return true; 

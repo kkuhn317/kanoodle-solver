@@ -156,7 +156,6 @@ let mouseY = 0;
 let conditions = [];
 let isSolving = false;
 let solverIterations = 0;
-let firstSolutionIterations = 0;
 let difficultyRating = "";
 
 // Helper to dynamically change game types
@@ -186,6 +185,5 @@ function setGameType(gameId) {
     currentSolutionIndex = -1;
     conditions = [];
     solverIterations = 0;
-    firstSolutionIterations = 0;
     difficultyRating = "";
 }
