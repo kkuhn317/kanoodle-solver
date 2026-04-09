@@ -38,13 +38,15 @@ function setupConditionsUI() {
         <option value="cannot_touch">Cannot Touch</option>
         <option value="do_not_use">Do Not Use</option>
         <option value="must_use">Must Use</option>
+        <option value="touching_edge">Must Touch Edge</option>
+        <option value="touching_corner">Must Touch Corner</option>
     `;
     
     const p2Select = document.createElement('select');
     p2Select.id = 'cond-piece2';
 
     typeSelect.addEventListener('change', (e) => {
-        const isSingle = e.target.value === 'do_not_use' || e.target.value === 'must_use';
+        const isSingle = ['do_not_use', 'must_use', 'touching_edge', 'touching_corner'].includes(e.target.value);
         p2Select.style.display = isSingle ? 'none' : 'inline-block';
     });
 
@@ -54,15 +56,23 @@ function setupConditionsUI() {
         const p1 = p1Select.value;
         const p2 = p2Select.value;
         const type = typeSelect.value;
-        const isSingle = type === 'do_not_use' || type === 'must_use';
+        const isSingle = ['do_not_use', 'must_use', 'touching_edge', 'touching_corner'].includes(type);
         
         if (!isSingle && p1 === p2) {
             alert('Please select two different pieces.');
             return;
         }
         if (isSingle) {
-            if (conditions.some(c => (c.type === 'do_not_use' || c.type === 'must_use') && c.pieces[0] === p1)) {
-                alert('A usage condition for this piece already exists. Remove it first.');
+            if (conditions.some(c => c.type === type && c.pieces[0] === p1)) {
+                alert('This condition already exists for this piece.');
+                return;
+            }
+            if (type === 'do_not_use' && conditions.some(c => c.pieces.includes(p1))) {
+                alert('Cannot add "Do Not Use" while other conditions exist for this piece.');
+                return;
+            }
+            if (type !== 'do_not_use' && conditions.some(c => c.type === 'do_not_use' && c.pieces[0] === p1)) {
+                alert('Cannot add condition because "Do Not Use" is active for this piece.');
                 return;
             }
             conditions.push({ type, pieces: [p1] });
@@ -149,10 +159,14 @@ function renderConditions() {
             return colorHex ? (colorHex === '#000000' ? '#aaaaaa' : colorHex) : '#fff';
         };
         
-        if (cond.type === 'do_not_use' || cond.type === 'must_use') {
-            const labelStr = cond.type === 'do_not_use' ? 'DO NOT USE' : 'MUST USE';
+        if (['do_not_use', 'must_use'].includes(cond.type)) {
+            let labelStr = cond.type === 'do_not_use' ? 'DO NOT USE' : 'MUST USE';
             text.innerHTML = `<span style="color:#888; font-size:0.9em; margin:0 5px;">${labelStr}</span>
                               <span style="color:${getPieceColor(cond.pieces[0])}; font-weight:bold;">${cond.pieces[0]}</span>`;
+        } else if (['touching_edge', 'touching_corner'].includes(cond.type)) {
+            let labelStr = cond.type === 'touching_edge' ? 'MUST TOUCH EDGE' : 'MUST TOUCH CORNER';
+            text.innerHTML = `<span style="color:${getPieceColor(cond.pieces[0])}; font-weight:bold;">${cond.pieces[0]}</span>
+                              <span style="color:#888; font-size:0.9em; margin:0 5px;">${labelStr}</span>`;
         } else {
             text.innerHTML = `<span style="color:${getPieceColor(cond.pieces[0])}; font-weight:bold;">${cond.pieces[0]}</span> 
                               <span style="color:#888; font-size:0.9em; margin:0 5px;">${actionStr}</span> 

@@ -116,9 +116,65 @@ function hasEmptyNeighbor(board, pieceId) {
     return false;
 }
 
+function isEdgeCell(index) {
+    const c = index % BOARD_COLS;
+    const r = Math.floor(index / BOARD_COLS);
+    if (c === 0 || c === BOARD_COLS - 1 || r === 0 || r === BOARD_ROWS - 1) return true;
+    
+    const gridType = GAMES[currentGame].gridType || 'square';
+    const neighbors = getNeighbors(index, gridType);
+    const expectedNeighbors = gridType === 'square' ? 4 : 6;
+    if (neighbors.length < expectedNeighbors) return true;
+    
+    if (GAMES[currentGame].invalidCells) {
+        for (let n of neighbors) {
+            if (GAMES[currentGame].invalidCells.includes(n)) return true;
+        }
+    }
+    return false;
+}
+
+function isCornerCell(index) {
+    const gridType = GAMES[currentGame].gridType || 'square';
+    const neighbors = getNeighbors(index, gridType);
+    let validNeighbors = 0;
+    for (let n of neighbors) {
+        if (!GAMES[currentGame].invalidCells || !GAMES[currentGame].invalidCells.includes(n)) {
+            validNeighbors++;
+        }
+    }
+    if (gridType === 'square') return validNeighbors <= 2;
+    if (gridType === 'triangular') return validNeighbors <= 3; 
+    return false;
+}
+
+function isPieceTouchingEdge(board, pieceId) {
+    for (let i = 0; i < TOTAL_CELLS; i++) {
+        if (board[i] === pieceId && isEdgeCell(i)) return true;
+    }
+    return false;
+}
+
+function isPieceTouchingCorner(board, pieceId) {
+    for (let i = 0; i < TOTAL_CELLS; i++) {
+        if (board[i] === pieceId && isCornerCell(i)) return true;
+    }
+    return false;
+}
+
 function isPlacementValidForConditions(board, placedPieceId) {
     for (let cond of conditions) {
-        if (cond.type === 'do_not_use' || cond.type === 'must_use') continue; // Handled pre-flight or post-flight
+        if (['do_not_use', 'must_use'].includes(cond.type)) continue; // Handled pre-flight or post-flight
+        
+        if (cond.type === 'touching_edge') {
+            if (placedPieceId === cond.pieces[0] && !isPieceTouchingEdge(board, placedPieceId)) return false;
+            continue;
+        }
+        
+        if (cond.type === 'touching_corner') {
+            if (placedPieceId === cond.pieces[0] && !isPieceTouchingCorner(board, placedPieceId)) return false;
+            continue;
+        }
         
         const p1 = cond.pieces[0];
         const p2 = cond.pieces[1];
@@ -180,7 +236,7 @@ async function solveRecursive(board, remainingPieces, onProgress) {
                 if (!board.includes(cond.pieces[0]) || !board.includes(cond.pieces[1])) {
                     return false; // Reject solution if both aren't on the board
                 }
-            } else if (cond.type === 'must_use') {
+            } else if (['must_use', 'touching_edge', 'touching_corner'].includes(cond.type)) {
                 if (!board.includes(cond.pieces[0])) {
                     return false; // Reject solution if required piece is missing
                 }
