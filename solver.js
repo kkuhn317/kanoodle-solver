@@ -168,8 +168,6 @@ function removePiece(board, emptyIndex, shape) {
     }
 }
 
-let solverIterations = 0;
-
 async function solveRecursive(board, remainingPieces, onProgress) {
     if (!isSolving) return true; // Abort signal
 
@@ -187,6 +185,9 @@ async function solveRecursive(board, remainingPieces, onProgress) {
                     return false; // Reject solution if required piece is missing
                 }
             }
+        }
+        if (allSolutions.length === 0) {
+            firstSolutionIterations = solverIterations;
         }
         allSolutions.push([...board]); 
         if (onProgress) onProgress(); 

@@ -85,6 +85,19 @@ button.primary {
     color: #aaaaaa;
 }
 
+#difficulty-badge {
+    margin: 15px auto 0 auto;
+    padding: 8px 20px;
+    background-color: #1a1a1a;
+    border: 1px solid #4a4a4a;
+    border-radius: 20px;
+    font-size: 1.05rem;
+    color: #e0e0e0;
+    text-align: center;
+    display: none;
+    width: fit-content;
+}
+
 button:disabled {
     opacity: 0.5;
     cursor: not-allowed;
