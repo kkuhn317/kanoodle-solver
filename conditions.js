@@ -37,13 +37,15 @@ function setupConditionsUI() {
         <option value="must_touch">Must Touch</option>
         <option value="cannot_touch">Cannot Touch</option>
         <option value="do_not_use">Do Not Use</option>
+        <option value="must_use">Must Use</option>
     `;
     
     const p2Select = document.createElement('select');
     p2Select.id = 'cond-piece2';
 
     typeSelect.addEventListener('change', (e) => {
-        p2Select.style.display = e.target.value === 'do_not_use' ? 'none' : 'inline-block';
+        const isSingle = e.target.value === 'do_not_use' || e.target.value === 'must_use';
+        p2Select.style.display = isSingle ? 'none' : 'inline-block';
     });
 
     const btnAdd = document.createElement('button');
@@ -52,18 +54,20 @@ function setupConditionsUI() {
         const p1 = p1Select.value;
         const p2 = p2Select.value;
         const type = typeSelect.value;
-        if (type !== 'do_not_use' && p1 === p2) {
+        const isSingle = type === 'do_not_use' || type === 'must_use';
+        
+        if (!isSingle && p1 === p2) {
             alert('Please select two different pieces.');
             return;
         }
-        if (type === 'do_not_use') {
-            if (conditions.some(c => c.type === 'do_not_use' && c.pieces[0] === p1)) {
-                alert('A condition for this piece already exists. Remove it first.');
+        if (isSingle) {
+            if (conditions.some(c => (c.type === 'do_not_use' || c.type === 'must_use') && c.pieces[0] === p1)) {
+                alert('A usage condition for this piece already exists. Remove it first.');
                 return;
             }
             conditions.push({ type, pieces: [p1] });
         } else {
-            if (conditions.some(c => c.type !== 'do_not_use' && (c.pieces.includes(p1) && c.pieces.includes(p2)))) {
+            if (conditions.some(c => c.type !== 'do_not_use' && c.type !== 'must_use' && (c.pieces.includes(p1) && c.pieces.includes(p2)))) {
                 alert('A condition between these pieces already exists. Remove it first.');
                 return;
             }
@@ -145,8 +149,9 @@ function renderConditions() {
             return colorHex ? (colorHex === '#000000' ? '#aaaaaa' : colorHex) : '#fff';
         };
         
-        if (cond.type === 'do_not_use') {
-            text.innerHTML = `<span style="color:#888; font-size:0.9em; margin:0 5px;">DO NOT USE</span>
+        if (cond.type === 'do_not_use' || cond.type === 'must_use') {
+            const labelStr = cond.type === 'do_not_use' ? 'DO NOT USE' : 'MUST USE';
+            text.innerHTML = `<span style="color:#888; font-size:0.9em; margin:0 5px;">${labelStr}</span>
                               <span style="color:${getPieceColor(cond.pieces[0])}; font-weight:bold;">${cond.pieces[0]}</span>`;
         } else {
             text.innerHTML = `<span style="color:${getPieceColor(cond.pieces[0])}; font-weight:bold;">${cond.pieces[0]}</span> 

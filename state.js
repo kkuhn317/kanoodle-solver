@@ -126,7 +126,6 @@ const FAN_EDITIONS = {
         { id: 'black2', base: [[0,0], [1,0], [2,0], [1,1]] }          // 4-big T
     ],
     magenta: [
-        // You can update these with the correct shapes when you get them!
         { id: 'black1', base: [[0,0], [0,1], [1,1], [2,1], [1,2]] },
         { id: 'black2', base: [[0,0], [1,0], [1,1], [2,1]] }
     ]

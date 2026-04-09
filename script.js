@@ -614,6 +614,8 @@ btnSolve.addEventListener('click', async () => {
     for (let cond of conditions) {
         if (cond.type === 'do_not_use') {
             if (boardState.includes(cond.pieces[0])) startingValid = false;
+        } else if (cond.type === 'must_use') {
+            // No start validation needed. If it's not on the board yet, the solver will place it.
         } else {
             if (boardState.includes(cond.pieces[0]) && boardState.includes(cond.pieces[1])) {
                 let touching = arePiecesTouching(boardState, cond.pieces[0], cond.pieces[1]);

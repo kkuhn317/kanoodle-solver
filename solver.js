@@ -103,16 +103,45 @@ function arePiecesTouching(board, p1, p2) {
     return false;
 }
 
+function hasEmptyNeighbor(board, pieceId) {
+    const gridType = GAMES[currentGame].gridType || 'square';
+    for (let i = 0; i < TOTAL_CELLS; i++) {
+        if (board[i] === pieceId) {
+            const neighbors = getNeighbors(i, gridType);
+            for (let n of neighbors) {
+                if (board[n] === 0) return true;
+            }
+        }
+    }
+    return false;
+}
+
 function isPlacementValidForConditions(board, placedPieceId) {
     for (let cond of conditions) {
-        if (cond.type === 'do_not_use') continue; // Handled pre-flight
+        if (cond.type === 'do_not_use' || cond.type === 'must_use') continue; // Handled pre-flight or post-flight
         
-        if (cond.pieces.includes(placedPieceId)) {
-            let otherPieceId = cond.pieces[0] === placedPieceId ? cond.pieces[1] : cond.pieces[0];
-            if (board.includes(otherPieceId)) {
-                let touching = arePiecesTouching(board, placedPieceId, otherPieceId);
-                if (cond.type === 'must_touch' && !touching) return false;
-                if (cond.type === 'cannot_touch' && touching) return false;
+        const p1 = cond.pieces[0];
+        const p2 = cond.pieces[1];
+        
+        if (cond.type === 'must_touch') {
+            const p1OnBoard = board.includes(p1);
+            const p2OnBoard = board.includes(p2);
+            
+            if (p1OnBoard && p2OnBoard) {
+                if ((placedPieceId === p1 || placedPieceId === p2) && !arePiecesTouching(board, p1, p2)) {
+                    return false;
+                }
+            } else if (p1OnBoard && !p2OnBoard) {
+                if (!hasEmptyNeighbor(board, p1)) return false;
+            } else if (!p1OnBoard && p2OnBoard) {
+                if (!hasEmptyNeighbor(board, p2)) return false;
+            }
+        } else if (cond.type === 'cannot_touch') {
+            if (placedPieceId === p1 || placedPieceId === p2) {
+                let otherPieceId = p1 === placedPieceId ? p2 : p1;
+                if (board.includes(otherPieceId)) {
+                    if (arePiecesTouching(board, placedPieceId, otherPieceId)) return false;
+                }
             }
         }
     }
@@ -152,6 +181,10 @@ async function solveRecursive(board, remainingPieces, onProgress) {
             if (cond.type === 'must_touch') {
                 if (!board.includes(cond.pieces[0]) || !board.includes(cond.pieces[1])) {
                     return false; // Reject solution if both aren't on the board
+                }
+            } else if (cond.type === 'must_use') {
+                if (!board.includes(cond.pieces[0])) {
+                    return false; // Reject solution if required piece is missing
                 }
             }
         }
