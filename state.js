@@ -115,7 +115,6 @@ let currentGame = 'kanoodle';
 let BOARD_COLS = GAMES[currentGame].cols;
 let BOARD_ROWS = GAMES[currentGame].rows;
 let TOTAL_CELLS = BOARD_COLS * BOARD_ROWS; 
-let MAX_SOLUTIONS = 1000; 
 
 // The pieces mapped as [x, y] coordinate offsets.
 let PIECE_DEFS = [...GAMES[currentGame].pieces];

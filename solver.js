@@ -244,7 +244,6 @@ async function solveRecursive(board, remainingPieces, onProgress) {
         }
         allSolutions.push([...board]); 
         if (onProgress) onProgress(); 
-        if (allSolutions.length >= MAX_SOLUTIONS) return true; 
         return false; 
     }
 

@@ -141,9 +141,7 @@ btnSolve.addEventListener('click', async () => {
     let stepText = allSolutions.length > 1 ? `(~${avgIters.toLocaleString()} steps/sol)` : `(${avgIters.toLocaleString()} steps)`;
     difficultyRating = `Difficulty: <strong style="color:${diffColor}">${diffName}</strong> <span style="color:#888; font-size:0.9em; margin-left:8px;">${stepText}</span>`;
 
-    if (allSolutions.length >= MAX_SOLUTIONS) {
-        btnSolve.innerText = `Found ${MAX_SOLUTIONS}+ Solutions (Capped)`;
-    } else if (wasAborted) {
+    if (wasAborted) {
         btnSolve.innerText = `Stopped. Found ${allSolutions.length} Solutions`;
     } else {
         btnSolve.innerText = `Found ${allSolutions.length} Solutions!`;
