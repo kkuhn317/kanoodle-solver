@@ -4,7 +4,14 @@
 
 function selectPiece(pieceId) {
     if (isSolving) return;
-    if (allSolutions.length > 0) return;
+    if (allSolutions.length > 0) {
+        if (!isHeatmapMode) return;
+        if (pieceId === 'blocker') return;
+        activePieceId = pieceId;
+        updatePaletteUI();
+        renderBoard();
+        return;
+    }
     if (pieceId !== 'blocker' && usedPieces.has(pieceId)) return; 
     
     if (activePieceId === pieceId) {
@@ -77,6 +84,7 @@ function handleClick(index) {
     if (isSolving) return;
     if (boardState[index] === -1) return;
     if (allSolutions.length > 0) {
+        if (isHeatmapMode) return;
         allSolutions = [];
         currentSolutionIndex = -1;
         boardState = [...startingBoardState];
@@ -85,6 +93,8 @@ function handleClick(index) {
         btnSolve.innerText = "Find All Solutions";
         btnSolve.disabled = false;
         btnResetStart.style.display = 'none';
+        btnHeatmap.style.display = 'none';
+        btnHeatmap.innerText = 'View Heatmap';
         renderBoard();
         return;
     }

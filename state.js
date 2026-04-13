@@ -157,11 +157,17 @@ let isSolving = false;
 let isResetting = false;
 let solverIterations = 0;
 let difficultyRating = "";
+let isHeatmapMode = false;
 
 // Helper to dynamically change game types
 function setGameType(gameId) {
     isSolving = false;
     isResetting = true;
+    isHeatmapMode = false;
+    if (typeof btnHeatmap !== 'undefined') {
+        btnHeatmap.style.display = 'none';
+        btnHeatmap.innerText = 'View Heatmap';
+    }
     currentGame = gameId;
     BOARD_COLS = GAMES[gameId].cols;
     BOARD_ROWS = GAMES[gameId].rows;

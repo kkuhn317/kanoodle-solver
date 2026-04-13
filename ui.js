@@ -7,15 +7,49 @@ const navContainer = document.getElementById('solution-nav');
 const counterText = document.getElementById('solution-counter');
 const btnSolve = document.getElementById('btn-solve');
 
+document.getElementById('btn-reset').style.backgroundColor = '#d32f2f';
+document.getElementById('btn-reset').style.color = '#ffffff';
+
 const btnResetStart = document.createElement('button');
 btnResetStart.id = 'btn-reset-start';
 btnResetStart.innerText = 'Reset to Start';
 btnResetStart.style.display = 'none';
 document.getElementById('btn-reset').parentNode.insertBefore(btnResetStart, document.getElementById('btn-reset').nextSibling);
 
+const btnHeatmap = document.createElement('button');
+btnHeatmap.id = 'btn-heatmap';
+btnHeatmap.innerText = 'View Heatmap';
+btnHeatmap.style.display = 'none';
+btnResetStart.parentNode.insertBefore(btnHeatmap, btnResetStart.nextSibling);
+
+btnHeatmap.addEventListener('click', () => {
+    isHeatmapMode = !isHeatmapMode;
+    if (isHeatmapMode) {
+        btnHeatmap.innerText = 'Exit Heatmap';
+        if (!activePieceId || activePieceId === 'blocker') {
+            const firstValidPiece = PIECE_DEFS.find(p => !usedPieces.has(p.id));
+            activePieceId = firstValidPiece ? firstValidPiece.id : PIECE_DEFS[0].id;
+        }
+    } else {
+        btnHeatmap.innerText = 'View Heatmap';
+        activePieceId = null;
+    }
+    updateNavUI();
+    updatePaletteUI();
+    renderBoard();
+});
+
 const difficultyBadge = document.createElement('div');
 difficultyBadge.id = 'difficulty-badge';
 navContainer.parentNode.insertBefore(difficultyBadge, navContainer.nextSibling);
+
+const heatmapStats = document.createElement('div');
+heatmapStats.id = 'heatmap-stats';
+heatmapStats.style.display = 'none';
+heatmapStats.style.textAlign = 'center';
+heatmapStats.style.marginTop = '5px';
+heatmapStats.style.color = '#aaaaaa';
+difficultyBadge.parentNode.insertBefore(heatmapStats, difficultyBadge.nextSibling);
 
 const cursorPiece = document.createElement('div');
 cursorPiece.id = 'cursor-piece';
@@ -246,6 +280,11 @@ function toggleFanEdition(edition) {
     let wasSolving = isSolving;
     if (isSolving) isSolving = false;
     isResetting = true;
+    isHeatmapMode = false;
+    if (typeof btnHeatmap !== 'undefined') {
+        btnHeatmap.style.display = 'none';
+        btnHeatmap.innerText = 'View Heatmap';
+    }
     if (allSolutions.length > 0 || wasSolving) {
         boardState = [...startingBoardState];
     }
@@ -288,12 +327,86 @@ function toggleFanEdition(edition) {
     renderConditions();
 }
 
-function renderBoard() {
+function hexToRgb(hex) {
+    let result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+    } : null;
+}
+
+function renderHeatmap() {
+    if (activePieceId && activePieceId !== 'blocker') {
+        let totalUses = 0;
+        for (let sol of allSolutions) {
+            if (sol.includes(activePieceId)) totalUses++;
+        }
+        let totalPct = allSolutions.length > 0 ? (totalUses / allSolutions.length) * 100 : 0;
+        const pieceDef = PIECE_DEFS.find(p => p.id === activePieceId);
+        const pieceColor = COLORS[pieceDef.id.replace(/[0-9]/g, '')] || '#fff';
+        heatmapStats.innerHTML = `Piece <strong style="color:${pieceColor === '#000000' ? '#aaaaaa' : pieceColor}">${activePieceId}</strong> is used in <strong>${Math.round(totalPct)}%</strong> of solutions.`;
+    } else {
+        heatmapStats.innerHTML = 'Select a piece to view its heatmap.';
+    }
+
     for (let i = 0; i < TOTAL_CELLS; i++) {
         const cellUi = document.getElementById(`cell-${i}`);
         if (!cellUi || boardState[i] === -1) continue;
         
         cellUi.classList.remove('blocker-style');
+        
+        if (!activePieceId) {
+            cellUi.style.backgroundColor = '#4a4a4a';
+            cellUi.style.border = 'none';
+            cellUi.innerText = '';
+            continue;
+        }
+        
+        let count = 0;
+        for (let sol of allSolutions) {
+            if (sol[i] === activePieceId) count++;
+        }
+        let pct = allSolutions.length > 0 ? count / allSolutions.length : 0;
+        
+        const pieceDef = PIECE_DEFS.find(p => p.id === activePieceId);
+        const pieceColor = COLORS[pieceDef.id.replace(/[0-9]/g, '')];
+        
+        if (pct === 0) {
+            cellUi.style.backgroundColor = '#4a4a4a';
+            cellUi.style.border = 'none';
+            cellUi.innerText = '';
+            cellUi.style.textShadow = 'none';
+        } else {
+            const rgb = hexToRgb(pieceColor === '#000000' ? '#aaaaaa' : pieceColor);
+            if (rgb) {
+                cellUi.style.backgroundColor = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${Math.max(0.15, pct)})`;
+                cellUi.innerText = Math.round(pct * 100) + '%';
+                cellUi.style.color = '#fff';
+                cellUi.style.textShadow = '1px 1px 2px #000, -1px -1px 2px #000, 1px -1px 2px #000, -1px 1px 2px #000';
+                cellUi.style.display = 'flex';
+                cellUi.style.alignItems = 'center';
+                cellUi.style.justifyContent = 'center';
+                cellUi.style.fontSize = '13px';
+                cellUi.style.fontWeight = 'bold';
+                cellUi.style.border = 'none';
+            }
+        }
+    }
+}
+
+function renderBoard() {
+    if (isHeatmapMode) {
+        renderHeatmap();
+        return;
+    }
+    for (let i = 0; i < TOTAL_CELLS; i++) {
+        const cellUi = document.getElementById(`cell-${i}`);
+        if (!cellUi || boardState[i] === -1) continue;
+        
+        cellUi.classList.remove('blocker-style');
+        cellUi.innerText = ''; 
+        cellUi.style.textShadow = 'none'; 
         
         if (boardState[i] === 0) {
             cellUi.style.backgroundColor = '#4a4a4a'; 
@@ -322,7 +435,15 @@ function updatePaletteUI() {
         if (!btn) return;
         btn.classList.remove('selected', 'used');
         if (allSolutions.length > 0) {
-            btn.classList.add('used');
+            if (isHeatmapMode) {
+                if (id === 'blocker') {
+                    btn.classList.add('used');
+                } else if (activePieceId === id) {
+                    btn.classList.add('selected');
+                }
+            } else {
+                btn.classList.add('used');
+            }
         } else if (id !== 'blocker' && usedPieces.has(id)) {
             btn.classList.add('used');
         } else if (activePieceId === id) {
@@ -415,10 +536,12 @@ function updateNavUI() {
     if (allSolutions.length === 0) {
         navContainer.style.display = 'none';
         difficultyBadge.style.display = 'none';
+        heatmapStats.style.display = 'none';
         return;
     }
-    navContainer.style.display = 'flex';
-    difficultyBadge.style.display = 'block';
+    navContainer.style.display = isHeatmapMode ? 'none' : 'flex';
+    difficultyBadge.style.display = isHeatmapMode ? 'none' : 'block';
+    heatmapStats.style.display = isHeatmapMode ? 'block' : 'none';
     difficultyBadge.innerHTML = difficultyRating;
     counterText.innerText = `${currentSolutionIndex + 1} of ${allSolutions.length}`;
     document.getElementById('btn-prev').disabled = currentSolutionIndex === 0;

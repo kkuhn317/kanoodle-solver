@@ -7,6 +7,15 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'r' || e.key === 'R') actionRotate();
     if (e.key === 'f' || e.key === 'F') actionFlip();
     if (e.key === 'Escape') { 
+        if (isHeatmapMode) {
+            isHeatmapMode = false;
+            btnHeatmap.innerText = 'View Heatmap';
+            activePieceId = null;
+            updateNavUI();
+            updatePaletteUI();
+            renderBoard();
+            return;
+        }
         activePieceId = null; 
         currentActiveShape = null;
         updatePaletteUI(); 
@@ -18,6 +27,9 @@ document.addEventListener('keydown', (e) => {
 document.getElementById('btn-reset').addEventListener('click', () => {
     isResetting = true;
     isSolving = false;
+    isHeatmapMode = false;
+    btnHeatmap.style.display = 'none';
+    btnHeatmap.innerText = 'View Heatmap';
     boardState.fill(0);
     if (GAMES[currentGame].invalidCells) {
         GAMES[currentGame].invalidCells.forEach(i => boardState[i] = -1);
@@ -56,6 +68,9 @@ btnSolve.addEventListener('click', async () => {
     }
 
     if (allSolutions.length > 0) {
+        isHeatmapMode = false;
+        btnHeatmap.style.display = 'none';
+        btnHeatmap.innerText = 'View Heatmap';
         boardState = [...startingBoardState];
         allSolutions = [];
         currentSolutionIndex = -1;
@@ -111,6 +126,9 @@ btnSolve.addEventListener('click', async () => {
 
     isSolving = true;
     isResetting = false;
+    isHeatmapMode = false;
+    btnHeatmap.style.display = 'none';
+    btnHeatmap.innerText = 'View Heatmap';
     btnSolve.innerText = "Stop (Found 0)";
     startingBoardState = [...boardState];
     allSolutions = [];
@@ -152,6 +170,7 @@ btnSolve.addEventListener('click', async () => {
     if (allSolutions.length > 0) {
         showSolution(0);
         btnResetStart.style.display = 'inline-block';
+        btnHeatmap.style.display = 'inline-block';
     } else {
         if (!wasAborted) alert("No solutions found for this starting layout.");
         boardState = [...startingBoardState];
@@ -165,6 +184,9 @@ document.getElementById('btn-prev').addEventListener('click', () => showSolution
 document.getElementById('btn-next').addEventListener('click', () => showSolution(currentSolutionIndex + 1));
 
 btnResetStart.addEventListener('click', () => {
+    isHeatmapMode = false;
+    btnHeatmap.style.display = 'none';
+    btnHeatmap.innerText = 'View Heatmap';
     boardState = [...startingBoardState];
     allSolutions = [];
     currentSolutionIndex = -1;
