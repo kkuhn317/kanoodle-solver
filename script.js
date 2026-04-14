@@ -129,7 +129,7 @@ btnSolve.addEventListener('click', async () => {
     isHeatmapMode = false;
     btnHeatmap.style.display = 'none';
     btnHeatmap.innerText = 'View Heatmap';
-    btnSolve.innerText = "Stop (Found 0)";
+    btnSolve.innerText = "Stop (0.0% - Found 0)";
     startingBoardState = [...boardState];
     allSolutions = [];
     solverIterations = 0;
@@ -138,8 +138,11 @@ btnSolve.addEventListener('click', async () => {
     // Wait a brief moment so the UI can update the button text
     await new Promise(r => setTimeout(r, 10));
 
-    await solveRecursive(boardState, remainingPieces, () => {
-        if (isSolving) btnSolve.innerText = `Stop (Found ${allSolutions.length})`;
+    await solveRecursive(boardState, remainingPieces, (progress = 0) => {
+        if (isSolving) {
+            let pct = (Math.floor(progress * 1000) / 10).toFixed(1);
+            btnSolve.innerText = `Stop (${pct}% - Found ${allSolutions.length})`;
+        }
     });
     
     if (isResetting) return;

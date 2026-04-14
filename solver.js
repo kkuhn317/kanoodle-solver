@@ -224,7 +224,7 @@ function removePiece(board, emptyIndex, shape) {
     }
 }
 
-async function solveRecursive(board, remainingPieces, onProgress) {
+async function solveRecursive(board, remainingPieces, onProgress, depth = 0, currentProgress = 0, progressShare = 1) {
     if (!isSolving) return true; // Abort signal
 
     let emptyIndex = 0;
@@ -243,30 +243,67 @@ async function solveRecursive(board, remainingPieces, onProgress) {
             }
         }
         allSolutions.push([...board]); 
-        if (onProgress) onProgress(); 
+        if (onProgress) onProgress(currentProgress); 
         return false; 
     }
 
-    for (let i = 0; i < remainingPieces.length; i++) {
-        let piece = remainingPieces[i];
-        let variations = pieceVariations[piece.id];
-
-        for (let shape of variations) {
-            if (canPlace(board, emptyIndex, shape)) {
-                placePiece(board, emptyIndex, shape, piece.id);
-                    
-                if (isPlacementValidForConditions(board, piece.id)) {
-                    let nextPieces = remainingPieces.filter(p => p.id !== piece.id);
-                    
-                    solverIterations++;
-                    if (solverIterations % 2500 === 0) {
-                        await new Promise(r => setTimeout(r, 0)); // Yield to keep browser responsive
-                        if (onProgress) onProgress();
+    // Pre-calculate branches for the first 2 depth levels to provide accurate UI progress updates
+    if (depth < 2) {
+        let branches = [];
+        for (let i = 0; i < remainingPieces.length; i++) {
+            let piece = remainingPieces[i];
+            let variations = pieceVariations[piece.id];
+            for (let shape of variations) {
+                if (canPlace(board, emptyIndex, shape)) {
+                    placePiece(board, emptyIndex, shape, piece.id);
+                    if (isPlacementValidForConditions(board, piece.id)) {
+                        branches.push({ piece, shape });
                     }
-
-                    if (await solveRecursive(board, nextPieces, onProgress)) return true; 
+                    removePiece(board, emptyIndex, shape);
                 }
-                removePiece(board, emptyIndex, shape);
+            }
+        }
+        
+        let totalBranches = branches.length;
+        for (let i = 0; i < totalBranches; i++) {
+            let branch = branches[i];
+            placePiece(board, emptyIndex, branch.shape, branch.piece.id);
+            let nextPieces = remainingPieces.filter(p => p.id !== branch.piece.id);
+            
+            solverIterations++;
+            let branchProgress = currentProgress + (i / totalBranches) * progressShare;
+            let branchShare = progressShare / totalBranches;
+
+            if (solverIterations % 2500 === 0) {
+                await new Promise(r => setTimeout(r, 0)); // Yield to keep browser responsive
+                if (onProgress) onProgress(branchProgress);
+            }
+
+            if (await solveRecursive(board, nextPieces, onProgress, depth + 1, branchProgress, branchShare)) return true;
+            removePiece(board, emptyIndex, branch.shape);
+        }
+    } else {
+        for (let i = 0; i < remainingPieces.length; i++) {
+            let piece = remainingPieces[i];
+            let variations = pieceVariations[piece.id];
+
+            for (let shape of variations) {
+                if (canPlace(board, emptyIndex, shape)) {
+                    placePiece(board, emptyIndex, shape, piece.id);
+                        
+                    if (isPlacementValidForConditions(board, piece.id)) {
+                        let nextPieces = remainingPieces.filter(p => p.id !== piece.id);
+                        
+                        solverIterations++;
+                        if (solverIterations % 2500 === 0) {
+                            await new Promise(r => setTimeout(r, 0)); // Yield to keep browser responsive
+                            if (onProgress) onProgress(currentProgress);
+                        }
+
+                        if (await solveRecursive(board, nextPieces, onProgress, depth + 1, currentProgress, progressShare)) return true; 
+                    }
+                    removePiece(board, emptyIndex, shape);
+                }
             }
         }
     }
